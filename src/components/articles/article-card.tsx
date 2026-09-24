@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import type { Article } from "@/lib/types";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface ArticleCardProps {
   article: Article;
@@ -11,6 +14,8 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ article, featured = false, className }: ArticleCardProps) {
+  const { locale, t } = useLocale();
+
   return (
     <article
       className={cn(
@@ -54,13 +59,17 @@ export function ArticleCard({ article, featured = false, className }: ArticleCar
           {article.lead}
         </p>
         <div className="mt-auto flex flex-wrap items-center gap-3 pt-2 text-sm text-muted-foreground">
-          <time dateTime={article.date}>{formatDate(article.date)}</time>
+          <time dateTime={article.date}>{formatDate(article.date, locale)}</time>
           {article.relatedIssueCount != null && (
-            <span>{article.relatedIssueCount} kapcsolódó ügy</span>
+            <span>
+              {t("common.relatedIssues", { count: article.relatedIssueCount })}
+            </span>
           )}
           {article.relatedSupporters != null && (
             <span className="font-medium text-foreground">
-              {article.relatedSupporters.toLocaleString("hu-HU")} embert érint
+              {t("common.peopleAffected", {
+                count: formatNumber(article.relatedSupporters, locale),
+              })}
             </span>
           )}
         </div>
@@ -68,7 +77,7 @@ export function ArticleCard({ article, featured = false, className }: ArticleCar
           href={`/cikk/${article.slug}`}
           className="mt-2 text-sm font-semibold text-primary hover:underline"
         >
-          Elolvasom
+          {t("common.readMore")}
         </Link>
       </div>
     </article>

@@ -3,23 +3,54 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LocationPicker } from "@/components/wizard/location-picker";
+import { LocationPicker, type LocationValue } from "@/components/wizard/location-picker";
 import { CategoryPicker } from "@/components/wizard/category-picker";
+import { IssueAiAssist } from "@/components/wizard/issue-ai-assist";
 import { DuplicateIssueCard } from "@/components/issues/duplicate-issue-card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CategoryId, IssueType } from "@/lib/types";
-import { getIssueBySlug } from "@/lib/mock-data";
-import { Camera, Lightbulb, AlertCircle, Sparkles } from "lucide-react";
+import type { CategoryId, Issue, IssueType } from "@/lib/types";
+import { Camera, Lightbulb, AlertCircle } from "lucide-react";
+import { useLocale } from "@/components/i18n/locale-provider";
+import type { DuplicateMatchDto } from "@/lib/ai/issue-assist-types";
 
 const TOTAL = 6;
 
+function toIssue(d: DuplicateMatchDto): Issue & { score?: number; reason?: string } {
+  return {
+    id: d.id,
+    slug: d.slug,
+    title: d.title,
+    settlement: d.settlement,
+    address: d.address,
+    category: d.category,
+    type: d.type,
+    status: d.status,
+    supporters: d.supporters,
+    problem: d.problem,
+    request: d.request,
+    location: d.location,
+    images: d.images,
+    createdAt: d.createdAt,
+    distanceMeters: d.distanceMeters,
+    score: d.score,
+    reason: d.reason,
+  };
+}
+
 export default function NewIssueWizardPage() {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const [step, setStep] = useState(1);
+  const [location, setLocation] = useState<LocationValue>({
+    address: "Budaörs, Szabadság út",
+    settlement: "Budaörs",
+    pin: { x: 52, y: 48 },
+    location: { lat: 47.4608, lng: 18.9583 },
+  });
   const [type, setType] = useState<IssueType | null>(null);
   const [category, setCategory] = useState<CategoryId | undefined>();
   const [title, setTitle] = useState("");
@@ -28,28 +59,67 @@ export default function NewIssueWizardPage() {
   const [images, setImages] = useState<string[]>([]);
   const [forceNew, setForceNew] = useState(false);
   const [published, setPublished] = useState(false);
-
-  const duplicate = getIssueBySlug("zebra-kell-az-iskola-ele");
+  const [duplicates, setDuplicates] = useState<DuplicateMatchDto[]>([]);
+  const [dupLoading, setDupLoading] = useState(false);
+  const [dupChecked, setDupChecked] = useState(false);
 
   function next() {
+    if (step === 5) {
+      void loadDuplicates();
+    }
     setStep((s) => Math.min(TOTAL, s + 1));
   }
   function back() {
     setStep((s) => Math.max(1, s - 1));
   }
 
+  async function loadDuplicates() {
+    setDupLoading(true);
+    setDupChecked(false);
+    try {
+      const res = await fetch("/api/ai/issue-assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          problem,
+          request,
+          category,
+          type,
+          settlement: location.settlement,
+          address: location.address,
+          location: location.location,
+          lang: locale,
+        }),
+      });
+      if (!res.ok) {
+        setDuplicates([]);
+        return;
+      }
+      const data = (await res.json()) as { duplicates?: DuplicateMatchDto[] };
+      setDuplicates(data.duplicates ?? []);
+    } catch {
+      setDuplicates([]);
+    } finally {
+      setDupLoading(false);
+      setDupChecked(true);
+    }
+  }
+
   if (published) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-[800px] flex-col justify-center px-4 py-10">
         <h1 className="text-3xl font-bold tracking-tight">
-          Köszönjük, az ügy megjelent!
+          {t("wizard.publishedTitle")}
         </h1>
         <article className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase text-muted-foreground">Előnézet</p>
-          <h2 className="mt-2 text-xl font-semibold">
-            {title || "Zebra kell az iskola elé"}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">Budaörs</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">
+            {t("wizard.previewLabel")}
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">{title}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {location.settlement || t("wizard.settlementFallback")}
+          </p>
         </article>
         <div className="mt-8 flex flex-col gap-3">
           <a
@@ -58,35 +128,44 @@ export default function NewIssueWizardPage() {
             rel="noopener noreferrer"
             className={cn(buttonVariants({ size: "lg" }), "h-12 font-bold")}
           >
-            Megosztom Facebookon
+            {t("wizard.shareFacebook")}
           </a>
           <Link
             href="/ugy/zebra-kell-az-iskola-ele"
             className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-12")}
           >
-            Ügy megnyitása
+            {t("wizard.openIssue")}
           </Link>
         </div>
       </div>
     );
   }
 
+  const showDuplicates =
+    !forceNew && (dupLoading || (dupChecked && duplicates.length > 0));
+
   return (
     <div className="mx-auto min-h-[calc(100vh-4rem)] max-w-[800px] px-4 py-6 md:py-10">
       <div className="mb-6">
         <p className="text-sm font-medium text-muted-foreground">
-          {step} / {TOTAL}
+          {t("wizard.stepOf", { step, total: TOTAL })}
         </p>
         <Progress value={(step / TOTAL) * 100} className="mt-2 h-1.5" />
       </div>
 
       {step === 1 && (
         <section className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Hol van a probléma?</h1>
-          <LocationPicker />
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("wizard.locationTitle")}
+          </h1>
+          <LocationPicker value={location} onChange={setLocation} />
           <div className="flex justify-end">
-            <button type="button" onClick={next} className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}>
-              Tovább
+            <button
+              type="button"
+              onClick={next}
+              className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}
+            >
+              {t("common.next")}
             </button>
           </div>
         </section>
@@ -94,7 +173,9 @@ export default function NewIssueWizardPage() {
 
       {step === 2 && (
         <section className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Mit szeretnél bejelenteni?</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("wizard.typeTitle")}
+          </h1>
           <div className="grid gap-4 sm:grid-cols-2">
             <button
               type="button"
@@ -107,9 +188,9 @@ export default function NewIssueWizardPage() {
               )}
             >
               <AlertCircle className="size-8 text-red-500" />
-              <p className="mt-3 text-xl font-bold">Probléma</p>
+              <p className="mt-3 text-xl font-bold">{t("wizard.typeProblem")}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Valami nem működik jól.
+                {t("wizard.typeProblemHint")}
               </p>
             </button>
             <button
@@ -123,15 +204,21 @@ export default function NewIssueWizardPage() {
               )}
             >
               <Lightbulb className="size-8 text-amber-500" />
-              <p className="mt-3 text-xl font-bold">Javaslat</p>
+              <p className="mt-3 text-xl font-bold">
+                {t("wizard.typeSuggestion")}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Valamit szeretnél jobbá tenni.
+                {t("wizard.typeSuggestionHint")}
               </p>
             </button>
           </div>
           <div className="flex justify-between">
-            <button type="button" onClick={back} className={cn(buttonVariants({ variant: "ghost" }))}>
-              Vissza
+            <button
+              type="button"
+              onClick={back}
+              className={cn(buttonVariants({ variant: "ghost" }))}
+            >
+              {t("common.back")}
             </button>
             <button
               type="button"
@@ -139,7 +226,7 @@ export default function NewIssueWizardPage() {
               disabled={!type}
               className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}
             >
-              Tovább
+              {t("common.next")}
             </button>
           </div>
         </section>
@@ -147,11 +234,17 @@ export default function NewIssueWizardPage() {
 
       {step === 3 && (
         <section className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Milyen kategória?</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("wizard.categoryTitle")}
+          </h1>
           <CategoryPicker value={category} onChange={setCategory} />
           <div className="flex justify-between">
-            <button type="button" onClick={back} className={cn(buttonVariants({ variant: "ghost" }))}>
-              Vissza
+            <button
+              type="button"
+              onClick={back}
+              className={cn(buttonVariants({ variant: "ghost" }))}
+            >
+              {t("common.back")}
             </button>
             <button
               type="button"
@@ -159,7 +252,7 @@ export default function NewIssueWizardPage() {
               disabled={!category}
               className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}
             >
-              Tovább
+              {t("common.next")}
             </button>
           </div>
         </section>
@@ -167,23 +260,25 @@ export default function NewIssueWizardPage() {
 
       {step === 4 && (
         <section className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Mondd el röviden</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("wizard.detailsTitle")}
+          </h1>
           <div className="space-y-4">
             <div>
               <label htmlFor="title" className="text-sm font-medium">
-                Mi legyen az ügy címe?
+                {t("wizard.titleLabel")}
               </label>
               <Input
                 id="title"
                 className="mt-1.5 h-11"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="pl. Zebra kell az iskola elé"
+                placeholder={t("wizard.titlePlaceholder")}
               />
             </div>
             <div>
               <label htmlFor="problem" className="text-sm font-medium">
-                Mi a probléma?
+                {t("wizard.problemLabel")}
               </label>
               <Textarea
                 id="problem"
@@ -191,12 +286,12 @@ export default function NewIssueWizardPage() {
                 rows={4}
                 value={problem}
                 onChange={(e) => setProblem(e.target.value)}
-                placeholder="Írd le, mi a gond…"
+                placeholder={t("wizard.problemPlaceholder")}
               />
             </div>
             <div>
               <label htmlFor="request" className="text-sm font-medium">
-                Mit szeretnél, mi történjen?
+                {t("wizard.requestLabel")}
               </label>
               <Textarea
                 id="request"
@@ -204,34 +299,34 @@ export default function NewIssueWizardPage() {
                 rows={3}
                 value={request}
                 onChange={(e) => setRequest(e.target.value)}
-                placeholder="pl. Gyalogátkelőhely kialakítását…"
+                placeholder={t("wizard.requestPlaceholder")}
               />
             </div>
-            <button
-              type="button"
-              className={cn(buttonVariants({ variant: "secondary" }), "gap-2")}
-              onClick={() => {
-                if (!title) setTitle("Zebra kell az iskola elé");
-                if (!problem)
-                  setProblem(
-                    "Az iskola előtt nincs biztonságos átkelési lehetőség a gyerekeknek.",
-                  );
-                if (!request)
-                  setRequest(
-                    "Gyalogátkelőhely kialakítását és 30 km/h-s sebességkorlátozást.",
-                  );
+            <IssueAiAssist
+              title={title}
+              problem={problem}
+              request={request}
+              category={category}
+              type={type}
+              settlement={location.settlement}
+              address={location.address}
+              location={location.location}
+              onAccept={(s) => {
+                setTitle(s.title);
+                setProblem(s.problem);
+                setRequest(s.request);
+                if (s.applyCategory) setCategory(s.applyCategory);
               }}
-            >
-              <Sparkles className="size-4" />
-              Segíts megfogalmazni
-            </button>
-            <p className="text-xs text-muted-foreground">
-              Az AI csak javaslatot ad – a szöveget te hagyod jóvá.
-            </p>
+              onDuplicates={(res) => setDuplicates(res.duplicates)}
+            />
           </div>
           <div className="flex justify-between">
-            <button type="button" onClick={back} className={cn(buttonVariants({ variant: "ghost" }))}>
-              Vissza
+            <button
+              type="button"
+              onClick={back}
+              className={cn(buttonVariants({ variant: "ghost" }))}
+            >
+              {t("common.back")}
             </button>
             <button
               type="button"
@@ -239,7 +334,7 @@ export default function NewIssueWizardPage() {
               disabled={!title.trim() || !problem.trim()}
               className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}
             >
-              Tovább
+              {t("common.next")}
             </button>
           </div>
         </section>
@@ -247,11 +342,13 @@ export default function NewIssueWizardPage() {
 
       {step === 5 && (
         <section className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Mutasd meg</h1>
-          <p className="text-muted-foreground">Maximum 5 kép. Mobilon a kamerát is használhatod.</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {t("wizard.imagesTitle")}
+          </h1>
+          <p className="text-muted-foreground">{t("wizard.imagesHint")}</p>
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-10 hover:bg-muted/40">
             <Camera className="size-10 text-muted-foreground" />
-            <span className="font-medium">Képek feltöltése vagy fénykép</span>
+            <span className="font-medium">{t("wizard.uploadImages")}</span>
             <input
               type="file"
               accept="image/*"
@@ -266,14 +363,24 @@ export default function NewIssueWizardPage() {
             />
           </label>
           {images.length > 0 && (
-            <p className="text-sm text-emerald-700">{images.length} kép kiválasztva</p>
+            <p className="text-sm text-emerald-700">
+              {t("wizard.imagesSelected", { count: images.length })}
+            </p>
           )}
           <div className="flex justify-between">
-            <button type="button" onClick={back} className={cn(buttonVariants({ variant: "ghost" }))}>
-              Vissza
+            <button
+              type="button"
+              onClick={back}
+              className={cn(buttonVariants({ variant: "ghost" }))}
+            >
+              {t("common.back")}
             </button>
-            <button type="button" onClick={next} className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}>
-              Tovább
+            <button
+              type="button"
+              onClick={next}
+              className={cn(buttonVariants({ size: "lg" }), "h-11 px-8")}
+            >
+              {t("common.next")}
             </button>
           </div>
         </section>
@@ -281,43 +388,72 @@ export default function NewIssueWizardPage() {
 
       {step === 6 && (
         <section className="space-y-6">
-          {!forceNew && duplicate ? (
+          {showDuplicates ? (
             <>
               <h1 className="text-3xl font-bold tracking-tight">
-                Lehet, hogy ezt már más is jelezte
+                {t("wizard.duplicateTitle")}
               </h1>
-              <DuplicateIssueCard
-                issue={{ ...duplicate, distanceMeters: 136 }}
-                onSupport={() => router.push(`/ugy/${duplicate.slug}`)}
-              />
+              {dupLoading && (
+                <p className="text-sm text-muted-foreground">
+                  {t("duplicate.checking")}
+                </p>
+              )}
+              <div className="space-y-4">
+                {duplicates.map((d) => (
+                  <DuplicateIssueCard
+                    key={d.id}
+                    issue={toIssue(d)}
+                    onSupport={() => router.push(`/ugy/${d.slug}`)}
+                  />
+                ))}
+              </div>
+              {!dupLoading && duplicates.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {t("duplicate.noneFound")}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => setForceNew(true)}
                 className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
               >
-                Mégis új ügyet hozok létre
+                {t("wizard.forceNew")}
               </button>
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-bold tracking-tight">Ellenőrzés</h1>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {t("wizard.previewTitle")}
+              </h1>
               <article className="rounded-2xl border border-border bg-card p-5">
-                <p className="text-xs uppercase text-muted-foreground">Előnézet</p>
+                <p className="text-xs uppercase text-muted-foreground">
+                  {t("wizard.previewLabel")}
+                </p>
                 <h2 className="mt-2 text-xl font-semibold">{title}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {location.settlement}
+                </p>
                 <p className="mt-3 text-sm leading-relaxed">{problem}</p>
                 <p className="mt-3 text-sm font-medium">{request}</p>
               </article>
               <button
                 type="button"
                 onClick={() => setPublished(true)}
-                className={cn(buttonVariants({ size: "lg" }), "h-12 w-full font-bold")}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "h-12 w-full font-bold",
+                )}
               >
-                Közzéteszem
+                {t("wizard.publish")}
               </button>
             </>
           )}
-          <button type="button" onClick={back} className={cn(buttonVariants({ variant: "ghost" }))}>
-            Vissza
+          <button
+            type="button"
+            onClick={back}
+            className={cn(buttonVariants({ variant: "ghost" }))}
+          >
+            {t("common.back")}
           </button>
         </section>
       )}

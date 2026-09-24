@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SiteHeader, MobileBottomNav } from "@/components/layout/site-header";
+import { AuthProvider } from "@/components/auth/auth-provider";
+import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { getDictionary } from "@/lib/i18n/translate";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,30 +17,39 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "KÖZÜGY – Közösségi ügyek, követhető megoldások",
-    template: "%s | KÖZÜGY",
-  },
-  description:
-    "Mutasd meg a térképen, mi a gond a környékeden – és nézd meg, másokat is érint-e. Közösségi ügyek, nyilvános válaszok, követhető megoldások.",
-  metadataBase: new URL("https://kozosugyunk.hu"),
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  return {
+    title: {
+      default: dict.meta.titleDefault,
+      template: `%s | ${dict.brand}`,
+    },
+    description: dict.meta.description,
+    metadataBase: new URL("https://kozosugyunk.hu"),
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+
   return (
     <html
-      lang="hu"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
-        <SiteHeader />
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
-        <MobileBottomNav />
+        <LocaleProvider initialLocale={locale}>
+          <AuthProvider>
+            <SiteHeader />
+            <main className="flex-1 pb-20 md:pb-0">{children}</main>
+            <MobileBottomNav />
+          </AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

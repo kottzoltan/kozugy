@@ -5,17 +5,23 @@ import { usePathname } from "next/navigation";
 import { Map, List, Plus, Bell, User, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-
-const nav = [
-  { href: "/terkep", label: "Térkép" },
-  { href: "/ugyek", label: "Ügyek" },
-  { href: "/megoldodott", label: "Megoldódott" },
-  { href: "/cikkek", label: "Cikkek" },
-];
+import { useAuth } from "@/components/auth/auth-provider";
+import { useT } from "@/components/i18n/locale-provider";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const t = useT();
+
   if (pathname.startsWith("/admin")) return null;
+
+  const nav = [
+    { href: "/terkep", label: t("nav.map") },
+    { href: "/ugyek", label: t("nav.issues") },
+    { href: "/megoldodott", label: t("nav.resolved") },
+    { href: "/cikkek", label: t("nav.articles") },
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md">
@@ -23,12 +29,12 @@ export function SiteHeader() {
         <Link
           href="/"
           className="focus-ring shrink-0 rounded-md text-lg font-bold tracking-tight text-brand md:text-xl"
-          aria-label="KÖZÜGY főoldal"
+          aria-label={t("nav.homeAria")}
         >
-          KÖZÜGY
+          {t("brand")}
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Fő navigáció">
+        <nav className="hidden items-center gap-1 md:flex" aria-label={t("nav.mainNav")}>
           {nav.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -50,29 +56,49 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <LanguageSwitcher />
           <button
             type="button"
             className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "hidden sm:inline-flex")}
-            aria-label="Keresés"
+            aria-label={t("nav.search")}
           >
             <Search className="size-4" />
           </button>
-          <Link
-            href="/profil"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "hidden gap-1.5 sm:inline-flex",
-            )}
-          >
-            <User className="size-4" />
-            Belépés
-          </Link>
+          {user ? (
+            <div className="hidden items-center gap-1 sm:flex">
+              <Link
+                href="/profil"
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}
+              >
+                <User className="size-4" />
+                {user.name?.split(" ")[0] ?? t("nav.profile")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+              >
+                {t("nav.logout")}
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/profil"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "hidden gap-1.5 sm:inline-flex",
+              )}
+            >
+              <User className="size-4" />
+              {t("nav.login")}
+            </Link>
+          )}
           <Link
             href="/uj-ugy"
             className={cn(buttonVariants({ size: "sm" }), "gap-1 font-semibold")}
           >
             <Plus className="size-4" />
-            Új ügy
+            <span className="hidden sm:inline">{t("nav.newIssue")}</span>
           </Link>
         </div>
       </div>
@@ -82,20 +108,21 @@ export function SiteHeader() {
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const t = useT();
   if (pathname.startsWith("/admin")) return null;
 
   const items = [
-    { href: "/terkep", label: "Térkép", icon: Map },
-    { href: "/korulottem", label: "Körülöttem", icon: List },
-    { href: "/uj-ugy", label: "Új ügy", icon: Plus, primary: true },
-    { href: "/ertesitesek", label: "Értesítések", icon: Bell },
-    { href: "/profil", label: "Profil", icon: User },
+    { href: "/terkep", label: t("nav.map"), icon: Map },
+    { href: "/korulottem", label: t("nav.nearby"), icon: List },
+    { href: "/uj-ugy", label: t("nav.newIssue"), icon: Plus, primary: true },
+    { href: "/ertesitesek", label: t("nav.notifications"), icon: Bell },
+    { href: "/profil", label: t("nav.profile"), icon: User },
   ] as const;
 
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
-      aria-label="Mobil navigáció"
+      aria-label={t("nav.mobileNav")}
     >
       <ul className="grid h-16 grid-cols-5">
         {items.map((item) => {

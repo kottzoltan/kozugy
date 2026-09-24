@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link2, MessageCircle, Share2, Check, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { useLocale } from "@/components/i18n/locale-provider";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +28,10 @@ export function ShareButton({
   variant = "outline",
   size = "default",
   className,
-  label = "MEGOSZTOM",
+  label,
 }: ShareButtonProps) {
+  const { t } = useLocale();
+  const resolvedLabel = label ?? t("share.cta");
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [thanks, setThanks] = useState(false);
@@ -102,24 +105,22 @@ export function ShareButton({
         type="button"
         onClick={nativeOrOpen}
         className={cn(buttonVariants({ variant, size: size === "icon" ? "icon" : "default" }), sizeClass, className)}
-        aria-label={label}
+        aria-label={resolvedLabel}
       >
-        {size === "icon" ? <Share2 className="size-4" /> : label}
+        {size === "icon" ? <Share2 className="size-4" /> : resolvedLabel}
       </button>
 
       {thanks && (
         <p className="mt-2 text-center text-sm text-muted-foreground" role="status">
-          Köszönjük, hogy segítesz láthatóvá tenni az ügyet.
+          {t("share.thanks")}
         </p>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Megosztás</DialogTitle>
-            <DialogDescription>
-              Segíts, hogy mások is lássák ezt az ügyet.
-            </DialogDescription>
+            <DialogTitle>{t("share.title")}</DialogTitle>
+            <DialogDescription>{t("share.description")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {channels.map((ch) => (
@@ -150,7 +151,7 @@ export function ShareButton({
               )}
             >
               {copied ? <Check className="size-4" /> : <Link2 className="size-4" />}
-              {copied ? "Másolva" : "Link másolása"}
+              {copied ? t("share.copied") : t("share.copy")}
             </button>
           </div>
         </DialogContent>

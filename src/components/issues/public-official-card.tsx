@@ -1,15 +1,19 @@
+"use client";
+
 import Link from "next/link";
 import type { PublicOfficial } from "@/lib/types";
-import { RELATION_LABEL } from "@/lib/status";
+import { getRelationLabel } from "@/lib/status";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface PublicOfficialCardProps {
   official: PublicOfficial;
 }
 
 export function PublicOfficialCard({ official }: PublicOfficialCardProps) {
+  const { locale, t } = useLocale();
   const initials = official.name
     .split(" ")
     .map((p) => p[0])
@@ -34,7 +38,7 @@ export function PublicOfficialCard({ official }: PublicOfficialCardProps) {
         <p className="text-sm text-muted-foreground">{official.title}</p>
         {official.relation && (
           <p className="mt-1 text-xs font-medium text-primary">
-            {RELATION_LABEL[official.relation]}
+            {getRelationLabel(official.relation, locale)}
           </p>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -54,11 +58,11 @@ export function PublicOfficialCard({ official }: PublicOfficialCardProps) {
               href={`/szemely/${official.slug}?claim=1`}
               className="text-xs font-semibold text-primary hover:underline"
             >
-              Ön az? Profil igénylése
+              {t("issue.claimProfile")}
             </Link>
           )}
           {official.verified && (
-            <span className="text-xs text-emerald-700">Ellenőrzött</span>
+            <span className="text-xs text-emerald-700">{t("issue.verified")}</span>
           )}
         </div>
       </div>

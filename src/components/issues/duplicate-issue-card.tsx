@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import type { Issue } from "@/lib/types";
@@ -5,13 +7,16 @@ import { formatDistance, formatNumber } from "@/lib/format";
 import { StatusBadge } from "@/components/issues/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface DuplicateIssueCardProps {
-  issue: Issue;
+  issue: Issue & { score?: number; reason?: string };
   onSupport?: () => void;
 }
 
 export function DuplicateIssueCard({ issue, onSupport }: DuplicateIssueCardProps) {
+  const { locale, t } = useLocale();
+
   return (
     <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h3 className="text-lg font-semibold">{issue.title}</h3>
@@ -19,11 +24,21 @@ export function DuplicateIssueCard({ issue, onSupport }: DuplicateIssueCardProps
         <MapPin className="size-3.5" />
         {issue.settlement}
         {issue.distanceMeters != null && (
-          <span>· {formatDistance(issue.distanceMeters)}</span>
+          <span>· {formatDistance(issue.distanceMeters, locale)}</span>
         )}
       </p>
+      {issue.score != null && (
+        <p className="mt-1 text-xs font-medium text-amber-800">
+          {t("duplicate.similarity", {
+            percent: Math.round(issue.score * 100),
+          })}
+          {issue.reason ? ` · ${issue.reason}` : null}
+        </p>
+      )}
       <p className="mt-2 text-sm font-medium">
-        {formatNumber(issue.supporters)} embert érint
+        {t("common.peopleAffected", {
+          count: formatNumber(issue.supporters, locale),
+        })}
       </p>
       <div className="mt-2">
         <StatusBadge status={issue.status} />
@@ -34,13 +49,13 @@ export function DuplicateIssueCard({ issue, onSupport }: DuplicateIssueCardProps
           onClick={onSupport}
           className={cn(buttonVariants(), "h-11 w-full font-bold")}
         >
-          ENGEM IS ÉRINT
+          {t("duplicate.supportCta")}
         </button>
         <Link
           href={`/ugy/${issue.slug}`}
           className={cn(buttonVariants({ variant: "outline" }), "h-10 w-full")}
         >
-          Ügy megnyitása
+          {t("duplicate.openIssue")}
         </Link>
       </div>
     </article>

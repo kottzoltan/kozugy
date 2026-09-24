@@ -1,5 +1,8 @@
-import type { IssueStatus, OfficialRelation } from "@/lib/types";
+import type { CategoryId, IssueStatus, OfficialRelation } from "@/lib/types";
+import { getDictionary } from "@/lib/i18n/translate";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/types";
 
+/** @deprecated Prefer getStatusLabel(status, locale) */
 export const STATUS_LABEL: Record<IssueStatus, string> = {
   uj: "Új ügy",
   ertesitve: "Értesítve",
@@ -27,6 +30,7 @@ export const STATUS_EMOJI: Record<IssueStatus, string> = {
   elutasitott: "⚪",
 };
 
+/** @deprecated Prefer getRelationLabel */
 export const RELATION_LABEL: Record<OfficialRelation, string> = {
   megszolitva: "Megszólítva",
   valaszolt: "Válaszolt",
@@ -34,6 +38,7 @@ export const RELATION_LABEL: Record<OfficialRelation, string> = {
   megoldasban: "Részt vett a megoldásban",
 };
 
+/** @deprecated Prefer getCategoryLabel */
 export const CATEGORY_LABEL: Record<string, string> = {
   kozlekedes: "Közlekedés",
   katyu: "Kátyú",
@@ -45,3 +50,26 @@ export const CATEGORY_LABEL: Record<string, string> = {
   epuletek: "Épületek",
   egyeb: "Egyéb",
 };
+
+export function getStatusLabel(
+  status: IssueStatus,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return getDictionary(locale).status[status];
+}
+
+export function getRelationLabel(
+  relation: OfficialRelation,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  return getDictionary(locale).relation[relation];
+}
+
+export function getCategoryLabel(
+  category: CategoryId | string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const dict = getDictionary(locale).category;
+  if (category in dict) return dict[category as CategoryId];
+  return category;
+}

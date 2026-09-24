@@ -4,47 +4,83 @@ import { useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { LoginModal } from "@/components/auth/login-modal";
+import { useAuth } from "@/components/auth/auth-provider";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { formatNumber } from "@/lib/format";
 
 interface SupportButtonProps {
+  slug: string;
   initialCount: number;
+  initiallySupported?: boolean;
   size?: "default" | "lg" | "sticky";
   className?: string;
-  loggedIn?: boolean;
 }
 
 export function SupportButton({
+  slug,
   initialCount,
+  initiallySupported = false,
   size = "default",
   className,
-  loggedIn = false,
 }: SupportButtonProps) {
+  const { user } = useAuth();
+  const { locale, t } = useLocale();
   const [count, setCount] = useState(initialCount);
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState(initiallySupported);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  async function persistSupport() {
+    setError(null);
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (user?.isDev) {
+      headers["x-kozugy-dev-user"] = JSON.stringify({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
+    }
+
+    const res = await fetch(`/api/issues/${slug}/support`, {
+      method: "POST",
+      headers,
+    });
+
+    if (res.status === 401) {
+      setLoginOpen(true);
+      return;
+    }
+
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error ?? t("support.saveError"));
+      return;
+    }
+
+    const data = (await res.json()) as {
+      supporters: number;
+      alreadySupported: boolean;
+    };
+    setCount(data.supporters);
+    setSupported(true);
+  }
+
   function handleClick() {
-    if (!loggedIn && !supported) {
+    if (supported) return;
+    if (!user) {
       setLoginOpen(true);
       return;
     }
     startTransition(() => {
-      if (supported) {
-        setSupported(false);
-        setCount((c) => c - 1);
-      } else {
-        setSupported(true);
-        setCount((c) => c + 1);
-      }
+      void persistSupport();
     });
   }
 
   function handleLoginSuccess() {
     setLoginOpen(false);
     startTransition(() => {
-      setSupported(true);
-      setCount((c) => c + 1);
+      void persistSupport();
     });
   }
 
@@ -56,28 +92,36 @@ export function SupportButton({
         : "h-10 px-4 text-sm font-semibold";
 
   return (
-    <>
+    <div className={cn(size === "sticky" ? "flex-1" : undefined)}>
       <button
         type="button"
-        disabled={pending}
+        disabled={pending || supported}
         onClick={handleClick}
         className={cn(
           buttonVariants({ variant: supported ? "secondary" : "default" }),
           sizeClass,
           className,
+          size === "sticky" && "w-full",
         )}
         aria-pressed={supported}
       >
-        {supported ? "Érintett vagy" : "ENGEM IS ÉRINT"}
+        {supported ? t("support.supported") : t("support.cta")}
         {size !== "sticky" && (
-          <span className="ml-1 opacity-80">· {formatNumber(count)}</span>
+          <span className="ml-1 opacity-80">
+            · {formatNumber(count, locale)}
+          </span>
         )}
       </button>
+      {error && (
+        <p className="mt-1 text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
       <LoginModal
         open={loginOpen}
         onOpenChange={setLoginOpen}
         onSuccess={handleLoginSuccess}
       />
-    </>
+    </div>
   );
 }

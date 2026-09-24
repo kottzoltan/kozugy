@@ -4,15 +4,15 @@ import type { Metadata } from "next";
 import {
   comments,
   getArticleBySlug,
-  getIssueBySlug,
   getOfficialsForIssue,
   getOrganization,
   getRelatedIssues,
   officialResponses,
   timelines,
 } from "@/lib/mock-data";
+import { getIssue } from "@/lib/data/issues";
 import { formatDate, formatNumber } from "@/lib/format";
-import { CATEGORY_LABEL } from "@/lib/status";
+import { getCategoryLabel } from "@/lib/status";
 import { StatusBadge } from "@/components/issues/status-badge";
 import { SupportButton } from "@/components/issues/support-button";
 import { ShareButton } from "@/components/issues/share-button";
@@ -26,29 +26,39 @@ import { IssueCard } from "@/components/issues/issue-card";
 import { IssueMap } from "@/components/map/issue-map";
 import { ArticleCard } from "@/components/articles/article-card";
 import { MapPin } from "lucide-react";
+import { getLocale } from "@/lib/i18n/get-locale";
+import { getDictionary, interpolate } from "@/lib/i18n/translate";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   const { slug } = await params;
-  const issue = getIssueBySlug(slug);
-  if (!issue) return { title: "Ügy nem található" };
+  const issue = await getIssue(slug);
+  if (!issue) return { title: t.issue.notFound };
+  const description = interpolate(t.issue.metaAffected, {
+    settlement: issue.settlement,
+    count: formatNumber(issue.supporters, locale),
+  });
   return {
     title: issue.title,
-    description: `${issue.settlement} · ${formatNumber(issue.supporters)} embert érint`,
+    description,
     openGraph: {
       title: issue.title,
-      description: `${issue.settlement} · ${formatNumber(issue.supporters)} embert érint`,
-      siteName: "KÖZÜGY",
+      description,
+      siteName: t.brand,
     },
   };
 }
 
 export default async function IssuePage({ params }: PageProps) {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   const { slug } = await params;
-  const issue = getIssueBySlug(slug);
+  const issue = await getIssue(slug);
   if (!issue) notFound();
 
   const org = getOrganization(issue.organizationId);
@@ -57,7 +67,7 @@ export default async function IssuePage({ params }: PageProps) {
     {
       id: "default",
       date: issue.createdAt,
-      title: "Ügy létrejött",
+      title: t.issue.created,
       icon: "created" as const,
     },
   ];
@@ -66,18 +76,19 @@ export default async function IssuePage({ params }: PageProps) {
   const article = issue.articleSlug
     ? getArticleBySlug(issue.articleSlug)
     : undefined;
+  const categoryLabel = getCategoryLabel(issue.category, locale);
 
   return (
     <>
       <div className="container-page py-6 md:py-10">
-        <nav className="text-sm text-muted-foreground" aria-label="Morzsamenü">
+        <nav className="text-sm text-muted-foreground" aria-label={t.issue.breadcrumb}>
           <Link href="/" className="hover:text-foreground">
-            KÖZÜGY
+            {t.brand}
           </Link>
           <span className="mx-1.5">›</span>
           <span>{issue.settlement}</span>
           <span className="mx-1.5">›</span>
-          <span>{CATEGORY_LABEL[issue.category]}</span>
+          <span>{categoryLabel}</span>
         </nav>
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[65%_35%] lg:gap-10">
@@ -85,7 +96,7 @@ export default async function IssuePage({ params }: PageProps) {
             <header>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold uppercase tracking-wide">
-                  {CATEGORY_LABEL[issue.category]}
+                  {categoryLabel}
                 </span>
                 <StatusBadge status={issue.status} />
               </div>
@@ -97,35 +108,42 @@ export default async function IssuePage({ params }: PageProps) {
                   <MapPin className="size-4" />
                   {issue.settlement}, {issue.address}
                 </span>
-                <time dateTime={issue.createdAt}>{formatDate(issue.createdAt)}</time>
+                <time dateTime={issue.createdAt}>
+                  {formatDate(issue.createdAt, locale)}
+                </time>
               </p>
             </header>
 
-            {/* Main CTA */}
             <div className="rounded-2xl border border-primary/20 bg-accent/40 p-5 md:p-6">
               <p className="text-2xl font-bold md:text-3xl">
-                {formatNumber(issue.supporters)} embert érint
+                {interpolate(t.common.peopleAffected, {
+                  count: formatNumber(issue.supporters, locale),
+                })}
               </p>
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <SupportButton initialCount={issue.supporters} size="lg" />
+                <SupportButton
+                  slug={issue.slug}
+                  initialCount={issue.supporters}
+                  size="lg"
+                />
                 <ShareButton title={issue.title} size="lg" />
               </div>
               <button
                 type="button"
                 className="mt-3 text-sm font-medium text-muted-foreground hover:text-foreground"
               >
-                Követem
+                {t.issue.follow}
               </button>
             </div>
 
             <ImageGallery images={issue.images} alt={issue.title} />
 
             <section>
-              <h2 className="text-xl font-semibold">Mi a probléma?</h2>
+              <h2 className="text-xl font-semibold">{t.issue.problem}</h2>
               {issue.summary && (
                 <div className="mt-3 rounded-xl bg-muted/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Röviden
+                    {t.issue.briefly}
                   </p>
                   <p className="mt-1 leading-relaxed">{issue.summary}</p>
                 </div>
@@ -134,14 +152,14 @@ export default async function IssuePage({ params }: PageProps) {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold">Mit szeretnének az érintettek?</h2>
+              <h2 className="text-xl font-semibold">{t.issue.request}</h2>
               <div className="mt-3 rounded-xl border-l-4 border-primary bg-card p-4 shadow-sm">
                 <p className="text-lg font-medium leading-relaxed">{issue.request}</p>
               </div>
             </section>
 
             <section>
-              <h2 className="mb-3 text-xl font-semibold">Hol van?</h2>
+              <h2 className="mb-3 text-xl font-semibold">{t.issue.where}</h2>
               <IssueMap
                 issues={[issue]}
                 interactive={false}
@@ -152,7 +170,7 @@ export default async function IssuePage({ params }: PageProps) {
             </section>
 
             <section>
-              <h2 className="mb-4 text-xl font-semibold">Mi történt eddig?</h2>
+              <h2 className="mb-4 text-xl font-semibold">{t.issue.timeline}</h2>
               <Timeline events={timeline} />
             </section>
 
@@ -166,7 +184,7 @@ export default async function IssuePage({ params }: PageProps) {
 
             {related.length > 0 && (
               <section>
-                <h2 className="text-xl font-semibold">Hasonló ügyek a közelben</h2>
+                <h2 className="text-xl font-semibold">{t.issue.similar}</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   {related.map((r) => (
                     <IssueCard key={r.id} issue={r} showSupport={false} compact />
@@ -177,19 +195,18 @@ export default async function IssuePage({ params }: PageProps) {
 
             {article && (
               <section>
-                <h2 className="mb-4 text-xl font-semibold">Írtunk róla</h2>
+                <h2 className="mb-4 text-xl font-semibold">{t.issue.wroteAbout}</h2>
                 <ArticleCard article={article} />
               </section>
             )}
           </div>
 
-          {/* Sidebar */}
           <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
             {org && <OrganizationCard organization={org} />}
             {decisionMakers.length > 0 && (
               <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Kapcsolódó döntéshozók
+                  {t.issue.decisionMakers}
                 </h2>
                 <div className="mt-3 space-y-3">
                   {decisionMakers.map((o) => (
@@ -199,7 +216,7 @@ export default async function IssuePage({ params }: PageProps) {
               </div>
             )}
             <div className="hidden rounded-2xl border border-border/80 bg-card p-4 text-sm text-muted-foreground lg:block">
-              <p className="font-semibold text-foreground">Megosztás</p>
+              <p className="font-semibold text-foreground">{t.issue.share}</p>
               <div className="mt-3">
                 <ShareButton title={issue.title} className="w-full" />
               </div>
@@ -208,10 +225,13 @@ export default async function IssuePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Mobile sticky CTA */}
       <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
         <div className="flex gap-2">
-          <SupportButton initialCount={issue.supporters} size="sticky" />
+          <SupportButton
+            slug={issue.slug}
+            initialCount={issue.supporters}
+            size="sticky"
+          />
           <ShareButton title={issue.title} size="sticky" />
         </div>
       </div>

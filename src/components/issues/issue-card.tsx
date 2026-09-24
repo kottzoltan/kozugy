@@ -1,12 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { MapPin } from "lucide-react";
 import type { Issue } from "@/lib/types";
 import { formatNumber } from "@/lib/format";
-import { CATEGORY_LABEL } from "@/lib/status";
+import { getCategoryLabel } from "@/lib/status";
 import { StatusBadge } from "@/components/issues/status-badge";
 import { SupportButton } from "@/components/issues/support-button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface IssueCardProps {
   issue: Issue;
@@ -23,6 +26,8 @@ export function IssueCard({
   compact = false,
   className,
 }: IssueCardProps) {
+  const { locale, t } = useLocale();
+
   return (
     <article
       className={cn(
@@ -44,7 +49,7 @@ export function IssueCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {CATEGORY_LABEL[issue.category]}
+            {getCategoryLabel(issue.category, locale)}
           </span>
           <StatusBadge status={issue.status} />
         </div>
@@ -58,23 +63,32 @@ export function IssueCard({
           {issue.settlement}
           {issue.distanceMeters != null && (
             <span className="text-muted-foreground/80">
-              · {issue.distanceMeters < 1000
+              ·{" "}
+              {issue.distanceMeters < 1000
                 ? `${issue.distanceMeters} m`
                 : `${(issue.distanceMeters / 1000).toFixed(1)} km`}
             </span>
           )}
         </p>
         <p className="text-sm font-medium">
-          {formatNumber(issue.supporters)} embert érint
+          {t("common.peopleAffected", {
+            count: formatNumber(issue.supporters, locale),
+          })}
         </p>
         {showDelta && issue.supportersChange24h != null && (
           <p className="text-sm font-medium text-emerald-700">
-            +{formatNumber(issue.supportersChange24h)} támogatás 24 óra alatt
+            {t("common.supportDelta", {
+              count: formatNumber(issue.supportersChange24h, locale),
+            })}
           </p>
         )}
         {showSupport && (
           <div className="mt-auto pt-1">
-            <SupportButton initialCount={issue.supporters} className="w-full" />
+            <SupportButton
+              slug={issue.slug}
+              initialCount={issue.supporters}
+              className="w-full"
+            />
           </div>
         )}
       </div>

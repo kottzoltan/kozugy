@@ -3,6 +3,8 @@
 import { categories } from "@/lib/mock-data";
 import type { CategoryId } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/components/i18n/locale-provider";
+import { getCategoryLabel } from "@/lib/status";
 
 interface CategoryPickerProps {
   value?: CategoryId;
@@ -10,8 +12,14 @@ interface CategoryPickerProps {
 }
 
 export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
+  const { locale, t } = useLocale();
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="listbox" aria-label="Kategória">
+    <div
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+      role="listbox"
+      aria-label={t("categoryPicker.aria")}
+    >
       {categories.map((cat) => (
         <button
           key={cat.id}
@@ -29,7 +37,9 @@ export function CategoryPicker({ value, onChange }: CategoryPickerProps) {
           <span className="text-2xl" aria-hidden>
             {cat.icon}
           </span>
-          <span className="text-sm font-semibold">{cat.label}</span>
+          <span className="text-sm font-semibold">
+            {getCategoryLabel(cat.id, locale)}
+          </span>
         </button>
       ))}
     </div>

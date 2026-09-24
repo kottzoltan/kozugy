@@ -6,34 +6,36 @@ import { formatDate } from "@/lib/format";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface OfficialResponseCardProps {
   response: OfficialResponse;
 }
 
 export function OfficialResponseCard({ response }: OfficialResponseCardProps) {
+  const { locale, t } = useLocale();
   const [showOriginal, setShowOriginal] = useState(false);
 
   return (
     <section className="rounded-2xl border-2 border-primary/20 bg-card p-5 shadow-sm md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Hivatalos válasz</h2>
+          <h2 className="text-xl font-semibold">{t("officialResponse.title")}</h2>
           <p className="mt-1 font-medium">{response.organizationName}</p>
           <time className="text-sm text-muted-foreground" dateTime={response.date}>
-            {formatDate(response.date)}
+            {formatDate(response.date, locale)}
           </time>
         </div>
         {response.verified && (
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-            Ellenőrzött forrás
+            {t("officialResponse.verified")}
           </span>
         )}
       </div>
 
       <div className="mt-5 rounded-xl bg-accent/60 p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Röviden · AI összefoglaló
+          {t("officialResponse.aiSummary")}
         </p>
         <p className="mt-2 text-base leading-relaxed">{response.summary}</p>
       </div>
@@ -45,7 +47,9 @@ export function OfficialResponseCard({ response }: OfficialResponseCardProps) {
           onClick={() => setShowOriginal((v) => !v)}
           aria-expanded={showOriginal}
         >
-          {showOriginal ? "Összefoglaló" : "Eredeti válasz"}
+          {showOriginal
+            ? t("officialResponse.summary")
+            : t("officialResponse.original")}
           <ChevronDown
             className={cn("size-4 transition-transform", showOriginal && "rotate-180")}
           />
@@ -57,15 +61,15 @@ export function OfficialResponseCard({ response }: OfficialResponseCardProps) {
             rel="noopener noreferrer"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
           >
-            Eredeti válasz megnyitása
+            {t("officialResponse.openOriginal")}
           </a>
         )}
       </div>
 
       {showOriginal && (
-        <pre className="mt-4 whitespace-pre-wrap rounded-xl border border-border bg-muted/50 p-4 font-sans text-sm leading-relaxed">
+        <div className="mt-4 rounded-xl border border-border bg-muted/40 p-4 text-sm leading-relaxed whitespace-pre-wrap">
           {response.originalText}
-        </pre>
+        </div>
       )}
     </section>
   );

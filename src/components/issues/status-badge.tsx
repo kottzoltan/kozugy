@@ -1,6 +1,9 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import type { IssueStatus } from "@/lib/types";
-import { STATUS_DOT, STATUS_EMOJI, STATUS_LABEL } from "@/lib/status";
+import { STATUS_DOT, STATUS_EMOJI, getStatusLabel } from "@/lib/status";
+import { useLocale } from "@/components/i18n/locale-provider";
 
 interface StatusBadgeProps {
   status: IssueStatus;
@@ -13,6 +16,8 @@ export function StatusBadge({
   className,
   showEmoji = true,
 }: StatusBadgeProps) {
+  const { locale } = useLocale();
+
   return (
     <span
       className={cn(
@@ -28,7 +33,7 @@ export function StatusBadge({
           aria-hidden
         />
       )}
-      {STATUS_LABEL[status]}
+      {getStatusLabel(status, locale)}
     </span>
   );
 }

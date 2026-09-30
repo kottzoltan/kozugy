@@ -35,6 +35,18 @@ export const categoryEnum = pgEnum("category", [
   "egyeb",
 ]);
 
+export const moderationStatusEnum = pgEnum("moderation_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const suggestionStatusEnum = pgEnum("suggestion_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
 export const users = pgTable("users", {
   id: uuid().primaryKey(),
   email: varchar({ length: 255 }).notNull(),
@@ -72,6 +84,43 @@ export const issues = pgTable("issues", {
     () => organizations.id,
   ),
   articleSlug: varchar("article_slug", { length: 160 }),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id),
+  moderationStatus: moderationStatusEnum("moderation_status")
+    .notNull()
+    .default("approved"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Wiki-style proposed edits — live issue unchanged until a moderator approves. */
+export const issueEditSuggestions = pgTable("issue_edit_suggestions", {
+  id: varchar({ length: 64 }).primaryKey(),
+  issueId: varchar("issue_id", { length: 64 })
+    .notNull()
+    .references(() => issues.id, { onDelete: "cascade" }),
+  authorUserId: uuid("author_user_id")
+    .notNull()
+    .references(() => users.id),
+  status: suggestionStatusEnum().notNull().default("pending"),
+  rationale: text(),
+  proposedTitle: varchar("proposed_title", { length: 255 }),
+  proposedSummary: text("proposed_summary"),
+  proposedProblem: text("proposed_problem"),
+  proposedRequest: text("proposed_request"),
+  proposedCategory: categoryEnum("proposed_category"),
+  proposedAddress: varchar("proposed_address", { length: 255 }),
+  proposedSettlement: varchar("proposed_settlement", { length: 120 }),
+  /** Snapshot of live fields at proposal time (for diff UI). */
+  previousTitle: varchar("previous_title", { length: 255 }).notNull(),
+  previousSummary: text("previous_summary"),
+  previousProblem: text("previous_problem").notNull(),
+  previousRequest: text("previous_request").notNull(),
+  previousCategory: categoryEnum("previous_category").notNull(),
+  previousAddress: varchar("previous_address", { length: 255 }).notNull(),
+  previousSettlement: varchar("previous_settlement", { length: 120 }).notNull(),
+  reviewerUserId: uuid("reviewer_user_id").references(() => users.id),
+  reviewNote: text("review_note"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -103,4 +152,5 @@ export const officialResponses = pgTable("official_responses", {
 
 export type DbUser = typeof users.$inferSelect;
 export type DbIssue = typeof issues.$inferSelect;
+export type DbEditSuggestion = typeof issueEditSuggestions.$inferSelect;
 export type NewIssueSupport = typeof issueSupports.$inferInsert;

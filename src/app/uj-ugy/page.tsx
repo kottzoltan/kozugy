@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import type { CategoryId, Issue, IssueType } from "@/lib/types";
 import { Camera, Lightbulb, AlertCircle } from "lucide-react";
 import { useLocale } from "@/components/i18n/locale-provider";
+import { useAuth } from "@/components/auth/auth-provider";
+import { LoginModal } from "@/components/auth/login-modal";
 import type { DuplicateMatchDto } from "@/lib/ai/issue-assist-types";
 
 const TOTAL = 6;
@@ -44,6 +46,7 @@ function toIssue(d: DuplicateMatchDto): Issue & { score?: number; reason?: strin
 export default function NewIssueWizardPage() {
   const router = useRouter();
   const { locale, t } = useLocale();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [location, setLocation] = useState<LocationValue>({
     address: "Budaörs, Szabadság út",
@@ -59,9 +62,13 @@ export default function NewIssueWizardPage() {
   const [images, setImages] = useState<string[]>([]);
   const [forceNew, setForceNew] = useState(false);
   const [published, setPublished] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicateMatchDto[]>([]);
   const [dupLoading, setDupLoading] = useState(false);
   const [dupChecked, setDupChecked] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   function next() {
     if (step === 5) {
@@ -106,7 +113,59 @@ export default function NewIssueWizardPage() {
     }
   }
 
-  if (published) {
+  async function publish() {
+    if (!user) {
+      setLoginOpen(true);
+      return;
+    }
+    if (!type || !category) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (user.isDev) {
+        headers["x-kozugy-dev-user"] = JSON.stringify({
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          roles: ["admin"],
+        });
+      }
+      const res = await fetch("/api/issues", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title,
+          problem,
+          request,
+          settlement: location.settlement,
+          address: location.address || location.settlement,
+          category,
+          type,
+          lat: location.location?.lat ?? 47.4608,
+          lng: location.location?.lng ?? 18.9583,
+          images,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        issue?: { slug: string };
+        error?: string;
+      } | null;
+      if (!res.ok || !data?.issue) {
+        setPublishError(data?.error ?? t("wizard.publishError"));
+        return;
+      }
+      setPublishedSlug(data.issue.slug);
+      setPublished(true);
+    } catch {
+      setPublishError(t("wizard.publishError"));
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  if (published && publishedSlug) {
+    const shareUrl = `https://kozosugyunk.hu/ugy/${publishedSlug}`;
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-[800px] flex-col justify-center px-4 py-10">
         <h1 className="text-3xl font-bold tracking-tight">
@@ -123,7 +182,7 @@ export default function NewIssueWizardPage() {
         </article>
         <div className="mt-8 flex flex-col gap-3">
           <a
-            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent("https://kozosugyunk.hu/ugy/zebra-kell-az-iskola-ele")}`}
+            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
             target="_blank"
             rel="noopener noreferrer"
             className={cn(buttonVariants({ size: "lg" }), "h-12 font-bold")}
@@ -131,7 +190,7 @@ export default function NewIssueWizardPage() {
             {t("wizard.shareFacebook")}
           </a>
           <Link
-            href="/ugy/zebra-kell-az-iskola-ele"
+            href={`/ugy/${publishedSlug}`}
             className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-12")}
           >
             {t("wizard.openIssue")}
@@ -436,15 +495,26 @@ export default function NewIssueWizardPage() {
                 <p className="mt-3 text-sm leading-relaxed">{problem}</p>
                 <p className="mt-3 text-sm font-medium">{request}</p>
               </article>
+              {publishError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {publishError}
+                </p>
+              )}
+              {!user && (
+                <p className="text-sm text-muted-foreground">
+                  {t("wizard.loginToPublish")}
+                </p>
+              )}
               <button
                 type="button"
-                onClick={() => setPublished(true)}
+                onClick={() => void publish()}
+                disabled={publishing}
                 className={cn(
                   buttonVariants({ size: "lg" }),
                   "h-12 w-full font-bold",
                 )}
               >
-                {t("wizard.publish")}
+                {publishing ? t("wizard.publishing") : t("wizard.publish")}
               </button>
             </>
           )}
@@ -457,6 +527,14 @@ export default function NewIssueWizardPage() {
           </button>
         </section>
       )}
+      <LoginModal
+        open={loginOpen}
+        onOpenChange={setLoginOpen}
+        onSuccess={() => {
+          setLoginOpen(false);
+          void publish();
+        }}
+      />
     </div>
   );
 }

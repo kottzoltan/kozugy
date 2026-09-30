@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const nav = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/ugyek", label: "Ügyek" },
-  { href: "/admin", label: "Moderáció" },
+  { href: "/admin/moderation", label: "Moderáció" },
   { href: "/admin", label: "Cikkek" },
   { href: "/admin", label: "Szervezetek" },
   { href: "/admin", label: "Döntéshozók" },

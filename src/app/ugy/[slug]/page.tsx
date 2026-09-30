@@ -16,6 +16,7 @@ import { getCategoryLabel } from "@/lib/status";
 import { StatusBadge } from "@/components/issues/status-badge";
 import { SupportButton } from "@/components/issues/support-button";
 import { ShareButton } from "@/components/issues/share-button";
+import { EditSuggestionForm } from "@/components/issues/edit-suggestion-form";
 import { ImageGallery } from "@/components/issues/image-gallery";
 import { Timeline } from "@/components/issues/timeline";
 import { OfficialResponseCard } from "@/components/issues/official-response-card";
@@ -120,13 +121,14 @@ export default async function IssuePage({ params }: PageProps) {
                   count: formatNumber(issue.supporters, locale),
                 })}
               </p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <SupportButton
                   slug={issue.slug}
                   initialCount={issue.supporters}
                   size="lg"
                 />
                 <ShareButton title={issue.title} size="lg" />
+                <EditSuggestionForm issue={issue} />
               </div>
               <button
                 type="button"

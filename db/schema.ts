@@ -47,6 +47,30 @@ export const suggestionStatusEnum = pgEnum("suggestion_status", [
   "rejected",
 ]);
 
+export const orgTypeEnum = pgEnum("org_type", [
+  "onkormanyzat",
+  "kormanyhivatal",
+  "fovaros",
+  "kozut",
+  "kozmu",
+  "egyeb",
+]);
+
+export const orgRelationRoleEnum = pgEnum("org_relation_role", [
+  "illetekes",
+  "ertesitve",
+  "kozmu",
+  "megfigyelo",
+]);
+
+export const orgLinkStatusEnum = pgEnum("org_link_status", [
+  "hozzarendelve",
+  "ertesitve",
+  "valaszolt",
+  "folyamatban",
+  "lezarva",
+]);
+
 export const users = pgTable("users", {
   id: uuid().primaryKey(),
   email: varchar({ length: 255 }).notNull(),
@@ -58,6 +82,8 @@ export const organizations = pgTable("organizations", {
   id: varchar({ length: 64 }).primaryKey(),
   slug: varchar({ length: 128 }).notNull().unique(),
   name: varchar({ length: 255 }).notNull(),
+  orgType: orgTypeEnum("org_type").notNull().default("egyeb"),
+  settlement: varchar({ length: 120 }),
   website: text(),
   contactEmail: varchar("contact_email", { length: 255 }),
   avgResponseDays: doublePrecision("avg_response_days"),
@@ -91,6 +117,28 @@ export const issues = pgTable("issues", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** Many-to-many: issue ↔ organizations (önkormányzat, közmű, stb.) */
+export const issueOrganizations = pgTable(
+  "issue_organizations",
+  {
+    issueId: varchar("issue_id", { length: 64 })
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    organizationId: varchar("organization_id", { length: 64 })
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: orgRelationRoleEnum().notNull().default("illetekes"),
+    linkStatus: orgLinkStatusEnum("link_status")
+      .notNull()
+      .default("hozzarendelve"),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    note: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.issueId, t.organizationId] })],
+);
 
 /** Wiki-style proposed edits — live issue unchanged until a moderator approves. */
 export const issueEditSuggestions = pgTable("issue_edit_suggestions", {
@@ -152,5 +200,6 @@ export const officialResponses = pgTable("official_responses", {
 
 export type DbUser = typeof users.$inferSelect;
 export type DbIssue = typeof issues.$inferSelect;
+export type DbOrganization = typeof organizations.$inferSelect;
 export type DbEditSuggestion = typeof issueEditSuggestions.$inferSelect;
 export type NewIssueSupport = typeof issueSupports.$inferInsert;

@@ -226,6 +226,8 @@ export const organizations: Organization[] = [
     id: "org-budaors",
     slug: "budaors-varos-onkormanyzata",
     name: "Budaörs Város Önkormányzata",
+    orgType: "onkormanyzat",
+    settlement: "Budaörs",
     website: "https://budaors.hu",
     contactEmail: "ugyfelszolgalat@budaors.hu",
     notifiedAt: "2026-09-25T09:00:00+02:00",
@@ -236,6 +238,7 @@ export const organizations: Organization[] = [
     id: "org-kozut",
     slug: "magyar-kozut",
     name: "Magyar Közút Nonprofit Zrt.",
+    orgType: "kozut",
     website: "https://www.kozut.hu",
     notifiedAt: "2026-09-12T10:00:00+02:00",
     respondedAt: "2026-09-21T11:15:00+02:00",
@@ -245,18 +248,24 @@ export const organizations: Organization[] = [
     id: "org-erd",
     slug: "erd-varos-onkormanyzata",
     name: "Érd Megyei Jogú Város Önkormányzata",
+    orgType: "onkormanyzat",
+    settlement: "Érd",
     notifiedAt: "2026-09-19T08:30:00+02:00",
   },
   {
     id: "org-torokbalint",
     slug: "torokbalint-varos-onkormanyzata",
     name: "Törökbálint Város Önkormányzata",
+    orgType: "onkormanyzat",
+    settlement: "Törökbálint",
     notifiedAt: "2026-09-21T09:00:00+02:00",
   },
   {
     id: "org-budakeszi",
     slug: "budakeszi-varos-onkormanyzata",
     name: "Budakeszi Város Önkormányzata",
+    orgType: "onkormanyzat",
+    settlement: "Budakeszi",
     notifiedAt: "2026-09-01T10:00:00+02:00",
     respondedAt: "2026-09-08T16:00:00+02:00",
   },
@@ -264,10 +273,74 @@ export const organizations: Organization[] = [
     id: "org-solymar",
     slug: "solymar-nagykozseg-onkormanyzata",
     name: "Solymár Nagyközség Önkormányzata",
+    orgType: "onkormanyzat",
+    settlement: "Solymár",
     notifiedAt: "2026-08-02T09:00:00+02:00",
     respondedAt: "2026-08-10T12:00:00+02:00",
   },
+  {
+    id: "org-fovaros",
+    slug: "budapest-fovaros-onkormanyzata",
+    name: "Budapest Főváros Önkormányzata",
+    orgType: "fovaros",
+    settlement: "Budapest",
+    website: "https://budapest.hu",
+  },
+  {
+    id: "org-kormanyhivatal-pest",
+    slug: "pest-varmegyei-kormanyhivatal",
+    name: "Pest Vármegyei Kormányhivatal",
+    orgType: "kormanyhivatal",
+    website: "https://kormanyhivatalok.hu",
+  },
+  {
+    id: "org-mvm",
+    slug: "mvm-next",
+    name: "MVM Next Energiakereskedelmi Zrt.",
+    orgType: "kozmu",
+    website: "https://www.mvm.hu",
+  },
+  {
+    id: "org-elmu",
+    slug: "elmu-halozati",
+    name: "ELMŰ Hálózati Kft.",
+    orgType: "kozmu",
+    website: "https://www.elmu.hu",
+  },
+  {
+    id: "org-eon",
+    slug: "eon-hungaria",
+    name: "E.ON Hungária Zrt.",
+    orgType: "kozmu",
+    website: "https://www.eon.hu",
+  },
+  {
+    id: "org-foviz",
+    slug: "foviz",
+    name: "Fővárosi Vízművek Zrt.",
+    orgType: "kozmu",
+    settlement: "Budapest",
+    website: "https://www.vizmuvek.hu",
+  },
 ];
+
+/** Default mock links for demo issues (when DB unavailable). */
+export const mockIssueOrgLinks: Record<
+  string,
+  { organizationId: string; role: import("@/lib/types").OrgRelationRole; linkStatus: import("@/lib/types").OrgLinkStatus }[]
+> = {
+  "zebra-kell-az-iskola-ele": [
+    { organizationId: "org-budaors", role: "illetekes", linkStatus: "valaszolt" },
+  ],
+  "katyus-utszakasz-az-m1-felhajtonal": [
+    { organizationId: "org-kozut", role: "illetekes", linkStatus: "folyamatban" },
+    { organizationId: "org-fovaros", role: "megfigyelo", linkStatus: "hozzarendelve" },
+  ],
+  "vilagitas-hianyzik-a-jatszoteron": [
+    { organizationId: "org-erd", role: "illetekes", linkStatus: "ertesitve" },
+    { organizationId: "org-elmu", role: "kozmu", linkStatus: "hozzarendelve" },
+  ],
+};
 
 export const officials: PublicOfficial[] = [
   {

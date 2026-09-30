@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getIssueBySlug,
   getOfficialsForIssue,
-  getOrganization,
   officialResponses,
 } from "@/lib/mock-data";
+import { getIssue } from "@/lib/data/issues";
 import { formatNumber } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/status";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AdminIssueActions } from "@/components/admin/issue-actions";
+import { AssignOrganizationsPanel } from "@/components/admin/assign-organizations";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -18,10 +18,9 @@ interface PageProps {
 
 export default async function AdminIssueDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const issue = getIssueBySlug(slug);
+  const issue = await getIssue(slug);
   if (!issue) notFound();
 
-  const org = getOrganization(issue.organizationId);
   const officials = getOfficialsForIssue(issue.officialIds);
   const response = officialResponses[slug];
 
@@ -45,11 +44,6 @@ export default async function AdminIssueDetailPage({ params }: PageProps) {
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm font-medium">
             {issue.request}
           </p>
-          {org && (
-            <p className="mt-4 text-sm">
-              Illetékes: <strong>{org.name}</strong>
-            </p>
-          )}
           {officials.length > 0 && (
             <p className="mt-2 text-sm">
               Döntéshozók: {officials.map((o) => o.name).join(", ")}
@@ -69,7 +63,14 @@ export default async function AdminIssueDetailPage({ params }: PageProps) {
             Nyilvános oldal
           </Link>
         </div>
-        <AdminIssueActions />
+        <div className="space-y-4">
+          <AssignOrganizationsPanel
+            slug={issue.slug}
+            category={issue.category}
+            settlement={issue.settlement}
+          />
+          <AdminIssueActions />
+        </div>
       </div>
     </div>
   );

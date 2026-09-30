@@ -5,12 +5,12 @@ import {
   comments,
   getArticleBySlug,
   getOfficialsForIssue,
-  getOrganization,
   getRelatedIssues,
   officialResponses,
   timelines,
 } from "@/lib/mock-data";
 import { getIssue } from "@/lib/data/issues";
+import { listIssueOrganizations } from "@/lib/data/organizations";
 import { formatDate, formatNumber } from "@/lib/format";
 import { getCategoryLabel } from "@/lib/status";
 import { StatusBadge } from "@/components/issues/status-badge";
@@ -20,7 +20,7 @@ import { EditSuggestionForm } from "@/components/issues/edit-suggestion-form";
 import { ImageGallery } from "@/components/issues/image-gallery";
 import { Timeline } from "@/components/issues/timeline";
 import { OfficialResponseCard } from "@/components/issues/official-response-card";
-import { OrganizationCard } from "@/components/issues/organization-card";
+import { IssueOrganizationsPanel } from "@/components/issues/issue-organizations-panel";
 import { PublicOfficialCard } from "@/components/issues/public-official-card";
 import { CommentList } from "@/components/issues/comment-list";
 import { IssueCard } from "@/components/issues/issue-card";
@@ -62,7 +62,7 @@ export default async function IssuePage({ params }: PageProps) {
   const issue = await getIssue(slug);
   if (!issue) notFound();
 
-  const org = getOrganization(issue.organizationId);
+  const orgLinks = await listIssueOrganizations(slug);
   const decisionMakers = getOfficialsForIssue(issue.officialIds);
   const timeline = timelines[slug] ?? [
     {
@@ -204,7 +204,7 @@ export default async function IssuePage({ params }: PageProps) {
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-            {org && <OrganizationCard organization={org} />}
+            <IssueOrganizationsPanel links={orgLinks} />
             {decisionMakers.length > 0 && (
               <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-sm">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

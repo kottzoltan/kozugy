@@ -89,11 +89,43 @@ export interface Organization {
   id: string;
   slug: string;
   name: string;
+  orgType?: OrgType;
+  settlement?: string;
   website?: string;
   contactEmail?: string;
   notifiedAt?: string;
   respondedAt?: string;
   avgResponseDays?: number;
+}
+
+export type OrgType =
+  | "onkormanyzat"
+  | "kormanyhivatal"
+  | "fovaros"
+  | "kozut"
+  | "kozmu"
+  | "egyeb";
+
+export type OrgRelationRole =
+  | "illetekes"
+  | "ertesitve"
+  | "kozmu"
+  | "megfigyelo";
+
+export type OrgLinkStatus =
+  | "hozzarendelve"
+  | "ertesitve"
+  | "valaszolt"
+  | "folyamatban"
+  | "lezarva";
+
+export interface IssueOrganizationLink {
+  organization: Organization;
+  role: OrgRelationRole;
+  linkStatus: OrgLinkStatus;
+  notifiedAt?: string;
+  respondedAt?: string;
+  note?: string;
 }
 
 export interface Article {

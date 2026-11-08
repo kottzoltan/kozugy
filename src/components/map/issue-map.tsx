@@ -109,7 +109,10 @@ export function IssueMap({
       map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     }
 
-    const onLoad = () => {
+    let layersAdded = false;
+    const addIssueLayers = () => {
+      if (layersAdded || map.getSource("issues")) return;
+      layersAdded = true;
       map.resize();
       map.addSource("issues", {
         type: "geojson",
@@ -175,17 +178,22 @@ export function IssueMap({
       setLoadError(false);
     };
 
-    map.on("load", onLoad);
+    // style.load fires once the style is ready; "load" waits for initial tiles too.
+    map.once("style.load", addIssueLayers);
+    map.on("load", addIssueLayers);
     map.on("error", (e) => {
-      // Non-fatal style warnings (missing images, etc.) also emit "error".
       const msg =
         e && typeof e === "object" && "error" in e && e.error instanceof Error
           ? e.error.message
           : "";
-      if (/worker|fetch|Failed to fetch|style/i.test(msg) && !map.isStyleLoaded()) {
+      if (/Failed to fetch|worker/i.test(msg) && !layersAdded) {
         setLoadError(true);
       }
     });
+    const readyFallback = window.setTimeout(() => {
+      if (!layersAdded && map.isStyleLoaded()) addIssueLayers();
+      else if (!layersAdded) setLoadError(true);
+    }, 12000);
 
     map.on("click", "clusters", (e) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });
@@ -224,6 +232,7 @@ export function IssueMap({
 
     mapRef.current = map;
     return () => {
+      window.clearTimeout(readyFallback);
       ro.disconnect();
       map.remove();
       mapRef.current = null;

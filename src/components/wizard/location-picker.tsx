@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n/locale-provider";
-import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
+import { DEFAULT_MAP_CENTER, MAP_STYLE } from "@/lib/map-style";
 import { loadMapLibre } from "@/lib/maplibre-setup";
 
 export interface LocationValue {
@@ -85,7 +85,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         const start = currentRef.current.location ?? DEFAULT_MAP_CENTER;
         const map = new maplibre.Map({
           container: mapContainerRef.current,
-          style: MAP_STYLE_URL,
+          style: MAP_STYLE,
           center: [start.lng, start.lat],
           zoom: 14,
           attributionControl: { compact: true },

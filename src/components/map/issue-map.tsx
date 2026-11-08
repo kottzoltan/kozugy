@@ -14,7 +14,7 @@ import { STATUS_DOT, STATUS_EMOJI, getStatusLabel } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/i18n/locale-provider";
-import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
+import { DEFAULT_MAP_CENTER, MAP_STYLE } from "@/lib/map-style";
 import { loadMapLibre } from "@/lib/maplibre-setup";
 
 const BUDAPEST: [number, number] = [DEFAULT_MAP_CENTER.lng, DEFAULT_MAP_CENTER.lat];
@@ -109,7 +109,7 @@ export function IssueMap({
 
         const map = new maplibre.Map({
           container: containerRef.current,
-          style: MAP_STYLE_URL,
+          style: MAP_STYLE,
           center: BUDAPEST,
           zoom: 10,
           attributionControl: { compact: true },

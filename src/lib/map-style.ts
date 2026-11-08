@@ -1,5 +1,26 @@
-/** OpenFreeMap liberty style — no API key required. */
-export const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+/** Carto light raster basemap — works without MapLibre vector workers. */
+export const MAP_STYLE = {
+  version: 8 as const,
+  sources: {
+    carto: {
+      type: "raster" as const,
+      tiles: [
+        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+        "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap © CARTO",
+    },
+  },
+  layers: [
+    {
+      id: "carto",
+      type: "raster" as const,
+      source: "carto",
+    },
+  ],
+};
 
 /** Default map center: Budaörs / west Budapest. */
 export const DEFAULT_MAP_CENTER = {

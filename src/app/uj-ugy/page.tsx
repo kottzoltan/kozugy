@@ -49,9 +49,9 @@ export default function NewIssueWizardPage() {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [location, setLocation] = useState<LocationValue>({
-    address: "Budaörs, Szabadság út",
-    settlement: "Budaörs",
-    pin: { x: 52, y: 48 },
+    address: "",
+    settlement: "",
+    pin: { x: 50, y: 50 },
     location: { lat: 47.4608, lng: 18.9583 },
   });
   const [type, setType] = useState<IssueType | null>(null);

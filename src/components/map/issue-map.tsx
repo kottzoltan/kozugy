@@ -16,9 +16,9 @@ import { STATUS_DOT, STATUS_EMOJI, getStatusLabel } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/i18n/locale-provider";
+import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
 
-const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-const BUDAPEST: [number, number] = [19.04, 47.5];
+const BUDAPEST: [number, number] = [DEFAULT_MAP_CENTER.lng, DEFAULT_MAP_CENTER.lat];
 
 interface IssueMapProps {
   issues: Issue[];
@@ -66,6 +66,7 @@ export function IssueMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [active, setActive] = useState<string | null>(selectedSlug ?? null);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const activeIssue = issues.find((i) => i.slug === active);
 
   const geojson = useMemo(() => issuesToGeoJSON(issues), [issues]);
@@ -94,7 +95,7 @@ export function IssueMap({
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: STYLE_URL,
+      style: MAP_STYLE_URL,
       center: BUDAPEST,
       zoom: 10,
       attributionControl: { compact: true },
@@ -105,7 +106,8 @@ export function IssueMap({
       map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     }
 
-    map.on("load", () => {
+    const onLoad = () => {
+      map.resize();
       map.addSource("issues", {
         type: "geojson",
         data: geojson,
@@ -167,7 +169,11 @@ export function IssueMap({
 
       fitToIssues(map, geojson);
       setReady(true);
-    });
+      setLoadError(false);
+    };
+
+    map.on("load", onLoad);
+    map.on("error", () => setLoadError(true));
 
     map.on("click", "clusters", (e) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });
@@ -199,8 +205,14 @@ export function IssueMap({
       map.getCanvas().style.cursor = "";
     });
 
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    ro.observe(containerRef.current);
+
     mapRef.current = map;
     return () => {
+      ro.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -226,12 +238,24 @@ export function IssueMap({
         className,
       )}
     >
-      {!ready && (
+      {!ready && !loadError && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-map">
           <p className="text-sm text-muted-foreground">Térkép betöltése…</p>
         </div>
       )}
-      <div ref={containerRef} className="absolute inset-0" aria-label={`Térkép: ${centerLabel}`} />
+      {loadError && !ready && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-map p-4 text-center">
+          <p className="text-sm text-muted-foreground">
+            A térkép most nem elérhető. Próbáld újra később.
+          </p>
+        </div>
+      )}
+      {/* h-full w-full — not absolute: maplibre-gl.css sets .maplibregl-map { position: relative } */}
+      <div
+        ref={containerRef}
+        className="h-full w-full"
+        aria-label={`Térkép: ${centerLabel}`}
+      />
 
       <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg bg-background/90 px-2.5 py-1.5 text-xs font-medium shadow-sm backdrop-blur">
         {centerLabel}
@@ -281,7 +305,6 @@ export function IssueMap({
         </div>
       )}
 
-      {/* Keep STATUS_DOT referenced for a11y legend consistency */}
       <span className="sr-only">{Object.values(STATUS_DOT).join(" ")}</span>
     </div>
   );

@@ -273,13 +273,13 @@ export const hu = {
     error: "Nem sikerült elküldeni a javaslatot.",
   },
   locationPicker: {
-    addressPlaceholder: "Írj be egy címet",
+    addressPlaceholder: "pl. Budaörs, Szabadság út",
     addressAria: "Cím keresése",
     useMyLocation: "Helyzetem használata",
     mapAria: "Helyszín választó térkép",
     pinAria: "Húzható helyszínjelölő",
-    hint: "Húzd a jelölőt, vagy koppints a térképre a pontos helyhez.",
-    currentLocation: "Jelenlegi helyzeted (Budaörs)",
+    hint: "Húzd a jelölőt, vagy koppints a térképre a pontos helyhez. Címnél Enter a kereséshez.",
+    currentLocation: "Jelenlegi helyzeted",
   },
   categoryPicker: {
     aria: "Kategória",
@@ -602,13 +602,13 @@ export const en: Dictionary = {
     error: "Could not submit the suggestion.",
   },
   locationPicker: {
-    addressPlaceholder: "Enter an address",
+    addressPlaceholder: "e.g. Budaörs, Szabadság út",
     addressAria: "Search address",
     useMyLocation: "Use my location",
     mapAria: "Location picker map",
     pinAria: "Draggable location pin",
-    hint: "Drag the pin or tap the map for the exact spot.",
-    currentLocation: "Your current location (Budaörs)",
+    hint: "Drag the pin or tap the map for the exact spot. Press Enter to search an address.",
+    currentLocation: "Your current location",
   },
   categoryPicker: {
     aria: "Category",

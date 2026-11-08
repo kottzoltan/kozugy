@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, Navigation } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import { Navigation } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n/locale-provider";
+import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
 
 export interface LocationValue {
   address: string;
@@ -19,21 +22,160 @@ interface LocationPickerProps {
   onChange?: (value: LocationValue) => void;
 }
 
-const DEFAULT: LocationValue = {
-  address: "Budaörs, Szabadság út",
-  settlement: "Budaörs",
-  pin: { x: 52, y: 48 },
-  location: { lat: 47.4608, lng: 18.9583 },
+const EMPTY: LocationValue = {
+  address: "",
+  settlement: "",
+  pin: { x: 50, y: 50 },
+  location: { ...DEFAULT_MAP_CENTER },
 };
+
+/** Sample text that was pre-filled in older builds — clear on focus. */
+const SAMPLE_ADDRESSES = new Set([
+  "Budaörs, Szabadság út",
+  "Jelenlegi helyzeted (Budaörs)",
+  "Your current location (Budaörs)",
+]);
 
 export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const t = useT();
-  const [local, setLocal] = useState<LocationValue>(value ?? DEFAULT);
+  const [local, setLocal] = useState<LocationValue>(value ?? EMPTY);
   const current = value ?? local;
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<Marker | null>(null);
+  const currentRef = useRef(current);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   function update(next: LocationValue) {
     if (!value) setLocal(next);
     onChange?.(next);
+  }
+
+  function setCoords(lat: number, lng: number, extras?: Partial<LocationValue>) {
+    const next: LocationValue = {
+      ...currentRef.current,
+      ...extras,
+      location: { lat, lng },
+      pin: { x: 50, y: 50 },
+    };
+    update(next);
+    markerRef.current?.setLngLat([lng, lat]);
+    mapRef.current?.easeTo({ center: [lng, lat], zoom: Math.max(mapRef.current.getZoom(), 14) });
+  }
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const start = currentRef.current.location ?? DEFAULT_MAP_CENTER;
+    const map = new MapLibreMap({
+      container: mapContainerRef.current,
+      style: MAP_STYLE_URL,
+      center: [start.lng, start.lat],
+      zoom: 14,
+      attributionControl: { compact: true },
+    });
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+
+    const marker = new Marker({ color: "#0f766e", draggable: true })
+      .setLngLat([start.lng, start.lat])
+      .addTo(map);
+
+    marker.on("dragend", () => {
+      const { lng, lat } = marker.getLngLat();
+      update({
+        ...currentRef.current,
+        location: { lat, lng },
+        pin: { x: 50, y: 50 },
+      });
+    });
+
+    map.on("click", (e) => {
+      setCoords(e.lngLat.lat, e.lngLat.lng);
+    });
+
+    map.on("load", () => map.resize());
+
+    const ro = new ResizeObserver(() => map.resize());
+    ro.observe(mapContainerRef.current);
+
+    mapRef.current = map;
+    markerRef.current = marker;
+
+    return () => {
+      ro.disconnect();
+      marker.remove();
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const loc = current.location;
+    if (!loc || !markerRef.current || !mapRef.current) return;
+    const { lng, lat } = markerRef.current.getLngLat();
+    if (Math.abs(lng - loc.lng) < 1e-7 && Math.abs(lat - loc.lat) < 1e-7) return;
+    markerRef.current.setLngLat([loc.lng, loc.lat]);
+    mapRef.current.setCenter([loc.lng, loc.lat]);
+  }, [current.location]);
+
+  async function geocodeAddress(query: string) {
+    const q = query.trim();
+    if (q.length < 3) return;
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("q", q);
+      url.searchParams.set("format", "json");
+      url.searchParams.set("limit", "1");
+      url.searchParams.set("countrycodes", "hu");
+      const res = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as Array<{
+        lat: string;
+        lon: string;
+        display_name: string;
+      }>;
+      const hit = data[0];
+      if (!hit) return;
+      const lat = Number(hit.lat);
+      const lng = Number(hit.lon);
+      const settlement =
+        hit.display_name.split(",")[0]?.trim() || currentRef.current.settlement;
+      setCoords(lat, lng, { address: q, settlement });
+    } catch {
+      // ignore geocode failures — pin still works
+    }
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setCoords(DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng, {
+        address: t("locationPicker.currentLocation"),
+        settlement: "Budaörs",
+      });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords(pos.coords.latitude, pos.coords.longitude, {
+          address: "",
+          settlement: currentRef.current.settlement || "",
+        });
+      },
+      () => {
+        setCoords(DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng, {
+          address: t("locationPicker.currentLocation"),
+          settlement: "Budaörs",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   }
 
   return (
@@ -47,6 +189,22 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
               address.split(",")[0]?.trim() || current.settlement;
             update({ ...current, address, settlement });
           }}
+          onFocus={() => {
+            if (SAMPLE_ADDRESSES.has(current.address)) {
+              update({ ...current, address: "", settlement: "" });
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void geocodeAddress(current.address);
+            }
+          }}
+          onBlur={() => {
+            if (current.address.trim().length >= 3) {
+              void geocodeAddress(current.address);
+            }
+          }}
           placeholder={t("locationPicker.addressPlaceholder")}
           aria-label={t("locationPicker.addressAria")}
           className="h-11 flex-1"
@@ -54,14 +212,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         <button
           type="button"
           className={cn(buttonVariants({ variant: "secondary" }), "h-11 gap-2")}
-          onClick={() =>
-            update({
-              address: t("locationPicker.currentLocation"),
-              settlement: "Budaörs",
-              pin: { x: 48, y: 52 },
-              location: { lat: 47.4608, lng: 18.9583 },
-            })
-          }
+          onClick={useMyLocation}
         >
           <Navigation className="size-4" />
           {t("locationPicker.useMyLocation")}
@@ -72,47 +223,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         role="application"
         aria-label={t("locationPicker.mapAria")}
       >
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `
-              linear-gradient(oklch(0.88 0.03 200 / 0.5) 1px, transparent 1px),
-              linear-gradient(90deg, oklch(0.88 0.03 200 / 0.5) 1px, transparent 1px)
-            `,
-            backgroundSize: "28px 28px",
-          }}
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            update({
-              ...current,
-              pin: {
-                x: ((e.clientX - rect.left) / rect.width) * 100,
-                y: ((e.clientY - rect.top) / rect.height) * 100,
-              },
-            });
-          }}
-        />
-        <button
-          type="button"
-          className="absolute z-10 -translate-x-1/2 -translate-y-full text-primary drop-shadow-md"
-          style={{ left: `${current.pin.x}%`, top: `${current.pin.y}%` }}
-          aria-label={t("locationPicker.pinAria")}
-          draggable
-          onDragEnd={(e) => {
-            const parent = (e.target as HTMLElement).parentElement;
-            if (!parent) return;
-            const rect = parent.getBoundingClientRect();
-            update({
-              ...current,
-              pin: {
-                x: ((e.clientX - rect.left) / rect.width) * 100,
-                y: ((e.clientY - rect.top) / rect.height) * 100,
-              },
-            });
-          }}
-        >
-          <MapPin className="size-10 fill-primary text-white" />
-        </button>
+        <div ref={mapContainerRef} className="h-full w-full" />
       </div>
       <p className="text-sm text-muted-foreground">{t("locationPicker.hint")}</p>
     </div>

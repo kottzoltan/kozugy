@@ -1,8 +1,27 @@
 /**
- * OpenFreeMap liberty — free public vector style, no API key.
- * @see https://openfreemap.org/
+ * Free raster basemap (no API key).
+ * ESRI World Street Map — widely used for demos; attribution required.
  */
-export const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+export const MAP_STYLE = {
+  version: 8 as const,
+  sources: {
+    esri: {
+      type: "raster" as const,
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "© Esri © OpenStreetMap contributors",
+    },
+  },
+  layers: [
+    {
+      id: "esri",
+      type: "raster" as const,
+      source: "esri",
+    },
+  ],
+};
 
 /** Default map center: Budaörs / west Budapest. */
 export const DEFAULT_MAP_CENTER = {

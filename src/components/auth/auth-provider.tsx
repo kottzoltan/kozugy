@@ -4,16 +4,19 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
+import { SessionProvider, signIn, signOut, useSession } from "next-auth/react";
+import type { AppRole } from "@/lib/auth/roles";
+import { isModeratorRole, normalizeRoles } from "@/lib/auth/roles";
 
 export type AuthUser = {
   id: string;
   email: string;
   name?: string | null;
+  image?: string | null;
+  roles: AppRole[];
   isDev?: boolean;
 };
 
@@ -21,9 +24,12 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   identityAvailable: boolean;
+  isAdmin: boolean;
+  isModerator: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string, name?: string) => Promise<void>;
   loginWithGoogle: () => void;
+  loginWithFacebook: () => void;
   loginDev: (email?: string) => void;
   logout: () => Promise<void>;
 };
@@ -31,81 +37,67 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const DEV_USER_KEY = "kozugy_dev_user";
 
-function metaName(meta: Record<string, unknown> | undefined): string | null {
-  if (!meta) return null;
-  const full = meta.full_name;
-  if (typeof full === "string" && full.trim()) return full;
-  const name = meta.name;
-  if (typeof name === "string" && name.trim()) return name;
-  return null;
-}
+function AuthStateProvider({ children }: { children: ReactNode }) {
+  const { data, status } = useSession();
+  const loading = status === "loading";
 
-function toAuthUser(u: {
-  id: string;
-  email?: string | null;
-  name?: string | null;
-  userMetadata?: Record<string, unknown>;
-  user_metadata?: Record<string, unknown>;
-}): AuthUser {
-  return {
-    id: u.id,
-    email: u.email ?? "",
-    name: metaName(u.userMetadata ?? u.user_metadata) ?? u.name ?? null,
-  };
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [identityAvailable, setIdentityAvailable] = useState(false);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    (async () => {
+  const user = useMemo<AuthUser | null>(() => {
+    if (data?.user?.id && data.user.email) {
+      return {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        image: data.user.image,
+        roles: normalizeRoles(data.user.roles),
+      };
+    }
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
       try {
-        const identity = await import("@netlify/identity");
-        await identity.handleAuthCallback();
-        // getSettings throws MissingIdentityError when Identity is not enabled
-        await identity.getSettings();
-        setIdentityAvailable(true);
-        const current = await identity.getUser();
-        if (current) setUser(toAuthUser(current));
-        unsubscribe = identity.onAuthChange((_event, u) => {
-          setUser(u ? toAuthUser(u) : null);
-        });
+        const raw = localStorage.getItem(DEV_USER_KEY);
+        if (raw) return JSON.parse(raw) as AuthUser;
       } catch {
-        setIdentityAvailable(false);
-        try {
-          const raw = localStorage.getItem(DEV_USER_KEY);
-          if (raw) setUser(JSON.parse(raw) as AuthUser);
-        } catch {
-          /* ignore */
-        }
-      } finally {
-        setLoading(false);
+        /* ignore */
       }
-    })();
-
-    return () => unsubscribe?.();
-  }, []);
+    }
+    return null;
+  }, [data]);
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
-    const { login } = await import("@netlify/identity");
-    setUser(toAuthUser(await login(email, password)));
+    const res = await signIn("credentials", {
+      email,
+      password,
+      mode: "login",
+      redirect: false,
+    });
+    if (res?.error) throw new Error(res.error);
   }, []);
 
   const signupWithEmail = useCallback(
     async (email: string, password: string, name?: string) => {
-      const { signup } = await import("@netlify/identity");
-      const u = await signup(email, password, name ? { full_name: name } : undefined);
-      setUser(toAuthUser(u));
+      const res = await signIn("credentials", {
+        email,
+        password,
+        name: name ?? "",
+        mode: "signup",
+        redirect: false,
+      });
+      if (res?.error) {
+        throw new Error(
+          res.error === "EMAIL_IN_USE" || res.code === "EMAIL_IN_USE"
+            ? "EMAIL_IN_USE"
+            : res.error,
+        );
+      }
     },
     [],
   );
 
   const loginWithGoogle = useCallback(() => {
-    void import("@netlify/identity").then(({ oauthLogin }) => oauthLogin("google"));
+    void signIn("google", { callbackUrl: "/" });
+  }, []);
+
+  const loginWithFacebook = useCallback(() => {
+    void signIn("facebook", { callbackUrl: "/" });
   }, []);
 
   const loginDev = useCallback((email = "dev@kozugy.info") => {
@@ -113,47 +105,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: "00000000-0000-4000-8000-000000000001",
       email,
       name: "Fejlesztő",
+      roles: ["admin"],
       isDev: true,
     };
     localStorage.setItem(DEV_USER_KEY, JSON.stringify(devUser));
-    setUser(devUser);
+    window.location.reload();
   }, []);
 
   const logout = useCallback(async () => {
     localStorage.removeItem(DEV_USER_KEY);
-    try {
-      const { logout: identityLogout } = await import("@netlify/identity");
-      await identityLogout();
-    } catch {
-      /* local only */
-    }
-    setUser(null);
+    await signOut({ callbackUrl: "/" });
   }, []);
 
   const value = useMemo(
     () => ({
       user,
       loading,
-      identityAvailable,
+      identityAvailable: true,
+      isAdmin: !!user && (user.roles.includes("admin") || !!user.isDev),
+      isModerator: !!user && (isModeratorRole(user.roles) || !!user.isDev),
       loginWithEmail,
       signupWithEmail,
       loginWithGoogle,
+      loginWithFacebook,
       loginDev,
       logout,
     }),
     [
       user,
       loading,
-      identityAvailable,
       loginWithEmail,
       signupWithEmail,
       loginWithGoogle,
+      loginWithFacebook,
       loginDev,
       logout,
     ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthStateProvider>{children}</AuthStateProvider>
+    </SessionProvider>
+  );
 }
 
 export function useAuth() {

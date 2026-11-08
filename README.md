@@ -11,7 +11,7 @@ Modern civic-tech platform for community issues — map-first, shareable, Hungar
 - Geist font
 - MapLibre GL (OpenFreeMap tiles)
 - Netlify Database (Postgres) + Drizzle ORM
-- Netlify Identity (`@netlify/identity`)
+- Auth.js (email + Google + Facebook, roles in Netlify DB)
 
 ## Develop
 
@@ -35,15 +35,34 @@ npx netlify dev                   # app + local Postgres
 
 Without a local DB the UI falls back to mock data; `ENGEM IS ÉRINT` still works via fejlesztői belépés.
 
-### Identity
+### Auth (Auth.js)
 
-Identity **does not** run under plain `next dev` / `netlify dev`. On Netlify deploy:
+Email/password, Google and Facebook via Auth.js. Roles live in Netlify DB (`users.roles`: `user` | `moderator` | `admin`).
 
-1. Project configuration → Identity → enable
-2. Optionally enable Google under External providers
-3. Autoconfirm can be turned on for easier testing
+Set these on Netlify (and locally in `.env.local`):
 
-Locally use **Fejlesztői belépés** in the login modal.
+```bash
+AUTH_SECRET=              # openssl rand -base64 32
+AUTH_URL=https://kozugy.info
+ADMIN_EMAILS=you@example.com   # bootstrap admin role on signup/OAuth
+
+# Google Cloud OAuth client (Web)
+AUTH_GOOGLE_ID=
+AUTH_GOOGLE_SECRET=
+NEXT_PUBLIC_AUTH_GOOGLE=1
+
+# Meta Facebook Login app
+AUTH_FACEBOOK_ID=
+AUTH_FACEBOOK_SECRET=
+NEXT_PUBLIC_AUTH_FACEBOOK=1
+```
+
+OAuth redirect URIs:
+
+- Google / Facebook: `https://kozugy.info/api/auth/callback/google` and `…/facebook`
+- Local: `http://localhost:3000/api/auth/callback/google` (etc.)
+
+`/admin` and `/api/admin/*` require `admin` or `moderator` role. Locally, **Fejlesztői belépés** still grants admin for UI testing.
 
 ## Main routes
 

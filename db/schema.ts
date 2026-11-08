@@ -72,11 +72,38 @@ export const orgLinkStatusEnum = pgEnum("org_link_status", [
 ]);
 
 export const users = pgTable("users", {
-  id: uuid().primaryKey(),
-  email: varchar({ length: 255 }).notNull(),
+  id: uuid().primaryKey().defaultRandom(),
+  email: varchar({ length: 255 }).notNull().unique(),
   name: varchar({ length: 255 }),
+  image: text(),
+  passwordHash: text("password_hash"),
+  emailVerified: timestamp("email_verified", { withTimezone: true }),
+  /** Server-controlled roles: user | moderator | admin */
+  roles: text().array().notNull().default(sql`'{"user"}'::text[]`),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+/** OAuth account links (Google, Facebook, …). */
+export const accounts = pgTable(
+  "accounts",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: varchar({ length: 32 }).notNull(),
+    provider: varchar({ length: 64 }).notNull(),
+    providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+    refreshToken: text("refresh_token"),
+    accessToken: text("access_token"),
+    expiresAt: integer("expires_at"),
+    tokenType: varchar("token_type", { length: 64 }),
+    scope: text(),
+    idToken: text("id_token"),
+    sessionState: text("session_state"),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })],
+);
 
 export const organizations = pgTable("organizations", {
   id: varchar({ length: 64 }).primaryKey(),

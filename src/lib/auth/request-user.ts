@@ -1,29 +1,29 @@
-import { getUser } from "@netlify/identity";
+import { auth } from "@/auth";
+import { isModeratorRole, normalizeRoles, type AppRole } from "@/lib/auth/roles";
 
 export type AuthUser = {
   id: string;
   email: string;
   name?: string | null;
-  roles: string[];
+  image?: string | null;
+  roles: AppRole[];
   isDev?: boolean;
 };
 
 export async function getRequestUser(request: Request): Promise<AuthUser | null> {
   try {
-    const identityUser = await getUser();
-    if (identityUser) {
-      const roles = Array.isArray(identityUser.appMetadata?.roles)
-        ? (identityUser.appMetadata.roles as string[])
-        : [];
+    const session = await auth();
+    if (session?.user?.id && session.user.email) {
       return {
-        id: identityUser.id,
-        email: identityUser.email ?? "",
-        name: identityUser.name ?? null,
-        roles,
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        image: session.user.image,
+        roles: normalizeRoles(session.user.roles),
       };
     }
   } catch {
-    /* Identity not configured */
+    /* auth not configured */
   }
 
   const header = request.headers.get("x-kozugy-dev-user");
@@ -40,7 +40,7 @@ export async function getRequestUser(request: Request): Promise<AuthUser | null>
           id: parsed.id,
           email: parsed.email,
           name: parsed.name ?? null,
-          roles: parsed.roles ?? ["admin"],
+          roles: normalizeRoles(parsed.roles ?? ["admin"]),
           isDev: true,
         };
       }
@@ -53,5 +53,9 @@ export async function getRequestUser(request: Request): Promise<AuthUser | null>
 }
 
 export function isModerator(user: AuthUser): boolean {
-  return user.roles.includes("admin") || user.roles.includes("moderator") || !!user.isDev;
+  return isModeratorRole(user.roles) || !!user.isDev;
+}
+
+export function isAdmin(user: AuthUser): boolean {
+  return user.roles.includes("admin") || !!user.isDev;
 }

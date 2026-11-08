@@ -11,7 +11,7 @@ import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, isModerator } = useAuth();
   const t = useT();
 
   if (pathname.startsWith("/admin")) return null;
@@ -66,6 +66,14 @@ export function SiteHeader() {
           </button>
           {user ? (
             <div className="hidden items-center gap-1 sm:flex">
+              {isModerator && (
+                <Link
+                  href="/admin"
+                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                >
+                  Admin
+                </Link>
+              )}
               <Link
                 href="/profil"
                 className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "gap-1.5")}

@@ -23,10 +23,10 @@ interface LoginModalProps {
 export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const t = useT();
   const {
-    identityAvailable,
     loginWithEmail,
     signupWithEmail,
     loginWithGoogle,
+    loginWithFacebook,
     loginDev,
   } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -35,6 +35,10 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const googleEnabled = Boolean(process.env.NEXT_PUBLIC_AUTH_GOOGLE);
+  const facebookEnabled = Boolean(process.env.NEXT_PUBLIC_AUTH_FACEBOOK);
+  const showDev = process.env.NODE_ENV !== "production";
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +53,12 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("auth.loginFailed"));
+      const msg = err instanceof Error ? err.message : t("auth.loginFailed");
+      setError(
+        msg === "EMAIL_IN_USE" || msg.includes("EMAIL_IN_USE")
+          ? t("auth.emailInUse")
+          : t("auth.loginFailed"),
+      );
     } finally {
       setPending(false);
     }
@@ -70,82 +79,93 @@ export function LoginModal({ open, onOpenChange, onSuccess }: LoginModalProps) {
         </DialogHeader>
 
         <div className="flex flex-col gap-2">
-          {identityAvailable && (
+          {googleEnabled && (
             <button
               type="button"
-              onClick={() => {
-                loginWithGoogle();
-              }}
+              onClick={() => loginWithGoogle()}
               className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
             >
               {t("auth.continueGoogle")}
             </button>
           )}
+          {facebookEnabled && (
+            <button
+              type="button"
+              onClick={() => loginWithFacebook()}
+              className={cn(buttonVariants({ variant: "outline" }), "h-11 w-full")}
+            >
+              {t("auth.continueFacebook")}
+            </button>
+          )}
 
-          {identityAvailable ? (
-            <form onSubmit={handleEmailSubmit} className="mt-2 space-y-2">
-              {mode === "signup" && (
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t("auth.name")}
-                  aria-label={t("auth.name")}
-                />
-              )}
+          {(googleEnabled || facebookEnabled) && (
+            <p className="py-1 text-center text-xs text-muted-foreground">
+              {t("auth.orEmail")}
+            </p>
+          )}
+
+          <form onSubmit={handleEmailSubmit} className="space-y-2">
+            {mode === "signup" && (
               <Input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={t("auth.email")}
-                aria-label={t("auth.email")}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t("auth.name")}
+                aria-label={t("auth.name")}
               />
-              <Input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t("auth.password")}
-                aria-label={t("auth.password")}
-              />
-              {error && (
-                <p className="text-sm text-destructive" role="alert">
-                  {error}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={pending}
-                className={cn(buttonVariants(), "h-11 w-full")}
-              >
-                {pending
-                  ? t("auth.pending")
-                  : mode === "login"
-                    ? t("auth.loginEmail")
-                    : t("auth.signup")}
-              </button>
-              <button
-                type="button"
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-                onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              >
-                {mode === "login" ? t("auth.noAccount") : t("auth.hasAccount")}
-              </button>
-            </form>
-          ) : (
-            <div className="space-y-2 rounded-xl border border-dashed border-border p-4">
-              <p className="text-sm text-muted-foreground">
-                {t("auth.identityLocal")}
+            )}
+            <Input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={t("auth.email")}
+              aria-label={t("auth.email")}
+            />
+            <Input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("auth.password")}
+              aria-label={t("auth.password")}
+            />
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
               </p>
-              <button
-                type="button"
-                onClick={handleDev}
-                className={cn(buttonVariants(), "h-11 w-full")}
-              >
-                {t("auth.devLogin")}
-              </button>
-            </div>
+            )}
+            <button
+              type="submit"
+              disabled={pending}
+              className={cn(buttonVariants(), "h-11 w-full")}
+            >
+              {pending
+                ? t("auth.pending")
+                : mode === "login"
+                  ? t("auth.loginEmail")
+                  : t("auth.signup")}
+            </button>
+            <button
+              type="button"
+              className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            >
+              {mode === "login" ? t("auth.noAccount") : t("auth.hasAccount")}
+            </button>
+          </form>
+
+          {showDev && (
+            <button
+              type="button"
+              onClick={handleDev}
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "mt-2 h-9 w-full text-xs text-muted-foreground",
+              )}
+            >
+              {t("auth.devLogin")}
+            </button>
           )}
         </div>
       </DialogContent>

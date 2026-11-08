@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { getDictionary } from "@/lib/i18n/translate";
+import { SITE_ORIGIN } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${dict.brand}`,
     },
     description: dict.meta.description,
-    metadataBase: new URL("https://kozosugyunk.hu"),
+    metadataBase: new URL(SITE_ORIGIN),
   };
 }
 

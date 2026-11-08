@@ -2,7 +2,7 @@
 
 Modern civic-tech platform for community issues — map-first, shareable, Hungarian UI.
 
-**Brand:** KÖZÜGY · **Domain:** kozosugyunk.hu
+**Brand:** KÖZÜGY · **Domain:** kozugy.info
 
 ## Stack
 

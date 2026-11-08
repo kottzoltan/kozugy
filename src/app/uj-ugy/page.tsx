@@ -18,6 +18,7 @@ import { useLocale } from "@/components/i18n/locale-provider";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoginModal } from "@/components/auth/login-modal";
 import type { DuplicateMatchDto } from "@/lib/ai/issue-assist-types";
+import { SITE_ORIGIN } from "@/lib/site";
 
 const TOTAL = 6;
 
@@ -165,7 +166,7 @@ export default function NewIssueWizardPage() {
   }
 
   if (published && publishedSlug) {
-    const shareUrl = `https://kozosugyunk.hu/ugy/${publishedSlug}`;
+    const shareUrl = `${SITE_ORIGIN}/ugy/${publishedSlug}`;
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-[800px] flex-col justify-center px-4 py-10">
         <h1 className="text-3xl font-bold tracking-tight">

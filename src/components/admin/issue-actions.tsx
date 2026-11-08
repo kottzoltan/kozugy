@@ -27,7 +27,7 @@ export function AdminIssueActions() {
   const [articleOpen, setArticleOpen] = useState(false);
   const [aiDone, setAiDone] = useState(false);
   const [fbPost, setFbPost] = useState(
-    "Több százan kérnek zebrát az iskola elé Budaörsön. Olvasd el, mit válaszolt az önkormányzat → kozosugyunk.hu",
+    "Több százan kérnek zebrát az iskola elé Budaörsön. Olvasd el, mit válaszolt az önkormányzat → kozugy.info",
   );
 
   return (

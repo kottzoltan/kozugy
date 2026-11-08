@@ -176,7 +176,7 @@ export default async function HomePage() {
 
       <footer className="border-t border-border/60 py-8 text-center text-sm text-muted-foreground">
         <p className="font-semibold text-foreground">{t.brand}</p>
-        <p className="mt-1">kozosugyunk.hu</p>
+        <p className="mt-1">kozugy.info</p>
       </footer>
     </>
   );

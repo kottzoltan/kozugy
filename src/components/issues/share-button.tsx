@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SITE_ORIGIN } from "@/lib/site";
 
 interface ShareButtonProps {
   title: string;
@@ -36,7 +37,7 @@ export function ShareButton({
   const [copied, setCopied] = useState(false);
   const [thanks, setThanks] = useState(false);
   const shareUrl =
-    url ?? (typeof window !== "undefined" ? window.location.href : "https://kozosugyunk.hu");
+    url ?? (typeof window !== "undefined" ? window.location.href : SITE_ORIGIN);
 
   async function nativeOrOpen() {
     if (typeof navigator !== "undefined" && navigator.share) {

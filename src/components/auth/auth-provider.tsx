@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void import("@netlify/identity").then(({ oauthLogin }) => oauthLogin("google"));
   }, []);
 
-  const loginDev = useCallback((email = "dev@kozosugyunk.hu") => {
+  const loginDev = useCallback((email = "dev@kozugy.info") => {
     const devUser: AuthUser = {
       id: "00000000-0000-4000-8000-000000000001",
       email,

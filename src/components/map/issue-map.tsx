@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
+import { ensureMaplibreWorker } from "@/lib/maplibre-setup";
 
 const BUDAPEST: [number, number] = [DEFAULT_MAP_CENTER.lng, DEFAULT_MAP_CENTER.lat];
 
@@ -92,6 +93,8 @@ export function IssueMap({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+
+    ensureMaplibreWorker();
 
     const map = new MapLibreMap({
       container: containerRef.current,
@@ -173,7 +176,16 @@ export function IssueMap({
     };
 
     map.on("load", onLoad);
-    map.on("error", () => setLoadError(true));
+    map.on("error", (e) => {
+      // Non-fatal style warnings (missing images, etc.) also emit "error".
+      const msg =
+        e && typeof e === "object" && "error" in e && e.error instanceof Error
+          ? e.error.message
+          : "";
+      if (/worker|fetch|Failed to fetch|style/i.test(msg) && !map.isStyleLoaded()) {
+        setLoadError(true);
+      }
+    });
 
     map.on("click", "clusters", (e) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });

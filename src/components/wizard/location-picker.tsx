@@ -9,6 +9,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n/locale-provider";
 import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
+import { ensureMaplibreWorker } from "@/lib/maplibre-setup";
 
 export interface LocationValue {
   address: string;
@@ -68,6 +69,8 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
+
+    ensureMaplibreWorker();
 
     const start = currentRef.current.location ?? DEFAULT_MAP_CENTER;
     const map = new MapLibreMap({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Map as MapLibreMap, Marker, NavigationControl } from "maplibre-gl";
+import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Navigation } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/components/i18n/locale-provider";
 import { DEFAULT_MAP_CENTER, MAP_STYLE_URL } from "@/lib/map-style";
-import { ensureMaplibreWorker } from "@/lib/maplibre-setup";
+import { loadMapLibre } from "@/lib/maplibre-setup";
 
 export interface LocationValue {
   address: string;
@@ -35,6 +35,8 @@ const SAMPLE_ADDRESSES = new Set([
   "Budaörs, Szabadság út",
   "Jelenlegi helyzeted (Budaörs)",
   "Your current location (Budaörs)",
+  "Jelenlegi helyzeted",
+  "Your current location",
 ]);
 
 export function LocationPicker({ value, onChange }: LocationPickerProps) {
@@ -64,53 +66,69 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     };
     update(next);
     markerRef.current?.setLngLat([lng, lat]);
-    mapRef.current?.easeTo({ center: [lng, lat], zoom: Math.max(mapRef.current.getZoom(), 14) });
+    mapRef.current?.easeTo({
+      center: [lng, lat],
+      zoom: Math.max(mapRef.current.getZoom(), 14),
+    });
   }
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
+    let cancelled = false;
+    let ro: ResizeObserver | null = null;
 
-    ensureMaplibreWorker();
+    (async () => {
+      try {
+        const maplibre = await loadMapLibre();
+        if (cancelled || !mapContainerRef.current || mapRef.current) return;
 
-    const start = currentRef.current.location ?? DEFAULT_MAP_CENTER;
-    const map = new MapLibreMap({
-      container: mapContainerRef.current,
-      style: MAP_STYLE_URL,
-      center: [start.lng, start.lat],
-      zoom: 14,
-      attributionControl: { compact: true },
-    });
-    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+        const start = currentRef.current.location ?? DEFAULT_MAP_CENTER;
+        const map = new maplibre.Map({
+          container: mapContainerRef.current,
+          style: MAP_STYLE_URL,
+          center: [start.lng, start.lat],
+          zoom: 14,
+          attributionControl: { compact: true },
+        });
+        map.addControl(
+          new maplibre.NavigationControl({ showCompass: false }),
+          "top-right",
+        );
 
-    const marker = new Marker({ color: "#0f766e", draggable: true })
-      .setLngLat([start.lng, start.lat])
-      .addTo(map);
+        const marker = new maplibre.Marker({ color: "#0f766e", draggable: true })
+          .setLngLat([start.lng, start.lat])
+          .addTo(map);
 
-    marker.on("dragend", () => {
-      const { lng, lat } = marker.getLngLat();
-      update({
-        ...currentRef.current,
-        location: { lat, lng },
-        pin: { x: 50, y: 50 },
-      });
-    });
+        marker.on("dragend", () => {
+          const { lng, lat } = marker.getLngLat();
+          update({
+            ...currentRef.current,
+            location: { lat, lng },
+            pin: { x: 50, y: 50 },
+          });
+        });
 
-    map.on("click", (e) => {
-      setCoords(e.lngLat.lat, e.lngLat.lng);
-    });
+        map.on("click", (e) => {
+          setCoords(e.lngLat.lat, e.lngLat.lng);
+        });
 
-    map.on("load", () => map.resize());
+        map.on("load", () => map.resize());
 
-    const ro = new ResizeObserver(() => map.resize());
-    ro.observe(mapContainerRef.current);
+        ro = new ResizeObserver(() => map.resize());
+        ro.observe(mapContainerRef.current);
 
-    mapRef.current = map;
-    markerRef.current = marker;
+        mapRef.current = map;
+        markerRef.current = marker;
+      } catch {
+        // map stays empty — address field still works
+      }
+    })();
 
     return () => {
-      ro.disconnect();
-      marker.remove();
-      map.remove();
+      cancelled = true;
+      ro?.disconnect();
+      markerRef.current?.remove();
+      mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
     };

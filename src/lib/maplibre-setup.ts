@@ -1,27 +1,16 @@
-export type MapLibreModule = typeof import("maplibre-gl");
+import { getVersion, setWorkerUrl } from "maplibre-gl";
 
-const CDN_VERSION = "6.11.2";
-const CDN_BASE = `https://cdn.jsdelivr.net/npm/maplibre-gl@${CDN_VERSION}/dist`;
-
-let loading: Promise<MapLibreModule> | null = null;
+let configured = false;
 
 /**
- * Load MapLibre from CDN (main + worker) so the bundler cannot break
- * the module-worker pairing. CSS still comes from the npm package import.
+ * Point MapLibre at a CDN worker that matches the installed package version.
+ * Next/Turbopack rewrites import.meta.url so the default relative worker 404s.
  */
-export function loadMapLibre(): Promise<MapLibreModule> {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("MapLibre is client-only"));
-  }
-  if (!loading) {
-    // Native dynamic import — bypasses Turbopack/webpack rewriting.
-    const href = `${CDN_BASE}/maplibre-gl.mjs`;
-    loading = (
-      new Function(`return import(${JSON.stringify(href)})`)() as Promise<MapLibreModule>
-    ).then((mod) => {
-      mod.setWorkerUrl(`${CDN_BASE}/maplibre-gl-worker.mjs`);
-      return mod;
-    });
-  }
-  return loading;
+export function ensureMaplibreWorker() {
+  if (configured || typeof window === "undefined") return;
+  configured = true;
+  const version = getVersion();
+  setWorkerUrl(
+    `https://cdn.jsdelivr.net/npm/maplibre-gl@${version}/dist/maplibre-gl-worker.mjs`,
+  );
 }

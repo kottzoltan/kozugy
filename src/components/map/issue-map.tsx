@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type {
+import {
   Map as MapLibreMap,
-  GeoJSONSource,
+  NavigationControl,
+  LngLatBounds,
+  type GeoJSONSource,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { MapPin } from "lucide-react";
@@ -15,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { DEFAULT_MAP_CENTER, MAP_STYLE } from "@/lib/map-style";
-import { loadMapLibre } from "@/lib/maplibre-setup";
+import { ensureMaplibreWorker } from "@/lib/maplibre-setup";
 
 const BUDAPEST: [number, number] = [DEFAULT_MAP_CENTER.lng, DEFAULT_MAP_CENTER.lat];
 
@@ -50,7 +52,7 @@ function issuesToGeoJSON(issues: Issue[]): GeoJSON.FeatureCollection {
   };
 }
 
-/** Real MapLibre map with clustering — OpenFreeMap tiles (no API key). */
+/** MapLibre map with clustering — Carto raster basemap + GeoJSON markers. */
 export function IssueMap({
   issues,
   className,
@@ -65,17 +67,12 @@ export function IssueMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [active, setActive] = useState<string | null>(selectedSlug ?? null);
   const [ready, setReady] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const activeIssue = issues.find((i) => i.slug === active);
 
   const geojson = useMemo(() => issuesToGeoJSON(issues), [issues]);
 
   const fitToIssues = useCallback(
-    (
-      map: MapLibreMap,
-      data: GeoJSON.FeatureCollection,
-      LngLatBounds: typeof import("maplibre-gl").LngLatBounds,
-    ) => {
+    (map: MapLibreMap, data: GeoJSON.FeatureCollection) => {
       if (!data.features.length) {
         map.setCenter(BUDAPEST);
         map.setZoom(mini ? 13 : 10);
@@ -98,166 +95,142 @@ export function IssueMap({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    let cancelled = false;
-    let ro: ResizeObserver | null = null;
-    let readyFallback = 0;
 
-    (async () => {
-      try {
-        const maplibre = await loadMapLibre();
-        if (cancelled || !containerRef.current || mapRef.current) return;
+    ensureMaplibreWorker();
 
-        const map = new maplibre.Map({
-          container: containerRef.current,
-          style: MAP_STYLE,
-          center: BUDAPEST,
-          zoom: 10,
-          attributionControl: { compact: true },
-          interactive: interactive || mini,
-        });
+    const map = new MapLibreMap({
+      container: containerRef.current,
+      style: MAP_STYLE,
+      center: BUDAPEST,
+      zoom: 10,
+      attributionControl: { compact: true },
+      interactive: interactive || mini,
+    });
 
-        if (!mini) {
-          map.addControl(
-            new maplibre.NavigationControl({ showCompass: false }),
-            "top-right",
-          );
-        }
+    if (!mini) {
+      map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    }
 
-        let layersAdded = false;
-        const addIssueLayers = () => {
-          if (layersAdded || map.getSource("issues")) return;
-          layersAdded = true;
-          map.resize();
-          map.addSource("issues", {
-            type: "geojson",
-            data: geojson,
-            cluster: !mini,
-            clusterMaxZoom: 14,
-            clusterRadius: 50,
-          });
+    let layersAdded = false;
+    const addIssueLayers = () => {
+      if (layersAdded || map.getSource("issues")) return;
+      layersAdded = true;
+      map.resize();
+      map.addSource("issues", {
+        type: "geojson",
+        data: geojson,
+        cluster: !mini,
+        clusterMaxZoom: 14,
+        clusterRadius: 50,
+      });
 
-          map.addLayer({
-            id: "clusters",
-            type: "circle",
-            source: "issues",
-            filter: ["has", "point_count"],
-            paint: {
-              "circle-color": "#0f766e",
-              "circle-radius": ["step", ["get", "point_count"], 16, 5, 20, 15, 26],
-              "circle-opacity": 0.9,
-            },
-          });
+      map.addLayer({
+        id: "clusters",
+        type: "circle",
+        source: "issues",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#0f766e",
+          "circle-radius": ["step", ["get", "point_count"], 16, 5, 20, 15, 26],
+          "circle-opacity": 0.9,
+        },
+      });
 
-          map.addLayer({
-            id: "cluster-count",
-            type: "symbol",
-            source: "issues",
-            filter: ["has", "point_count"],
-            layout: {
-              "text-field": "{point_count_abbreviated}",
-              "text-size": 12,
-            },
-            paint: { "text-color": "#ffffff" },
-          });
+      map.addLayer({
+        id: "cluster-count",
+        type: "symbol",
+        source: "issues",
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": "{point_count_abbreviated}",
+          "text-size": 12,
+        },
+        paint: { "text-color": "#ffffff" },
+      });
 
-          map.addLayer({
-            id: "unclustered",
-            type: "circle",
-            source: "issues",
-            filter: ["!", ["has", "point_count"]],
-            paint: {
-              "circle-color": [
-                "match",
-                ["get", "status"],
-                "megoldott",
-                "#10b981",
-                "vizsgalat",
-                "#fbbf24",
-                "folyamatban",
-                "#f97316",
-                "ertesitve",
-                "#3b82f6",
-                "elutasitott",
-                "#94a3b8",
-                "#0ea5e9",
-              ],
-              "circle-radius": mini ? 7 : 8,
-              "circle-stroke-width": 2,
-              "circle-stroke-color": "#ffffff",
-            },
-          });
+      map.addLayer({
+        id: "unclustered",
+        type: "circle",
+        source: "issues",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": [
+            "match",
+            ["get", "status"],
+            "megoldott",
+            "#10b981",
+            "vizsgalat",
+            "#fbbf24",
+            "folyamatban",
+            "#f97316",
+            "ertesitve",
+            "#3b82f6",
+            "elutasitott",
+            "#94a3b8",
+            "#0ea5e9",
+          ],
+          "circle-radius": mini ? 7 : 8,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
 
-          fitToIssues(map, geojson, maplibre.LngLatBounds);
-          setReady(true);
-          setLoadError(false);
-        };
+      fitToIssues(map, geojson);
+      setReady(true);
+    };
 
-        map.once("style.load", addIssueLayers);
-        map.on("load", addIssueLayers);
-        map.on("error", (e) => {
-          const msg =
-            e && typeof e === "object" && "error" in e && e.error instanceof Error
-              ? e.error.message
-              : "";
-          if (/Failed to fetch|worker/i.test(msg) && !layersAdded) {
-            setLoadError(true);
-          }
-        });
+    map.once("style.load", addIssueLayers);
+    map.on("load", addIssueLayers);
+    // Don't block the UI forever if style events are slow.
+    const showSoon = window.setTimeout(() => {
+      map.resize();
+      if (map.isStyleLoaded()) addIssueLayers();
+      else setReady(true);
+    }, 2500);
 
-        readyFallback = window.setTimeout(() => {
-          if (!layersAdded && map.isStyleLoaded()) addIssueLayers();
-          else if (!layersAdded) setLoadError(true);
-        }, 12000);
+    map.on("click", "clusters", (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });
+      const clusterId = features[0]?.properties?.cluster_id;
+      const source = map.getSource("issues") as GeoJSONSource;
+      if (clusterId == null) return;
+      source.getClusterExpansionZoom(clusterId).then((zoom) => {
+        const coords = (features[0].geometry as GeoJSON.Point).coordinates as [
+          number,
+          number,
+        ];
+        map.easeTo({ center: coords, zoom });
+      });
+    });
 
-        map.on("click", "clusters", (e) => {
-          const features = map.queryRenderedFeatures(e.point, {
-            layers: ["clusters"],
-          });
-          const clusterId = features[0]?.properties?.cluster_id;
-          const source = map.getSource("issues") as GeoJSONSource;
-          if (clusterId == null) return;
-          source.getClusterExpansionZoom(clusterId).then((zoom) => {
-            const coords = (features[0].geometry as GeoJSON.Point)
-              .coordinates as [number, number];
-            map.easeTo({ center: coords, zoom });
-          });
-        });
+    map.on("click", "unclustered", (e) => {
+      if (!interactive) return;
+      const slug = e.features?.[0]?.properties?.slug as string | undefined;
+      if (slug) setActive(slug);
+    });
 
-        map.on("click", "unclustered", (e) => {
-          if (!interactive) return;
-          const slug = e.features?.[0]?.properties?.slug as string | undefined;
-          if (slug) setActive(slug);
-        });
+    map.on("mouseenter", "clusters", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "clusters", () => {
+      map.getCanvas().style.cursor = "";
+    });
+    map.on("mouseenter", "unclustered", () => {
+      map.getCanvas().style.cursor = interactive ? "pointer" : "";
+    });
+    map.on("mouseleave", "unclustered", () => {
+      map.getCanvas().style.cursor = "";
+    });
 
-        map.on("mouseenter", "clusters", () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", "clusters", () => {
-          map.getCanvas().style.cursor = "";
-        });
-        map.on("mouseenter", "unclustered", () => {
-          map.getCanvas().style.cursor = interactive ? "pointer" : "";
-        });
-        map.on("mouseleave", "unclustered", () => {
-          map.getCanvas().style.cursor = "";
-        });
+    const ro = new ResizeObserver(() => map.resize());
+    ro.observe(containerRef.current);
 
-        ro = new ResizeObserver(() => map.resize());
-        ro.observe(containerRef.current);
-        mapRef.current = map;
-      } catch {
-        if (!cancelled) setLoadError(true);
-      }
-    })();
-
+    mapRef.current = map;
     return () => {
-      cancelled = true;
-      window.clearTimeout(readyFallback);
-      ro?.disconnect();
-      mapRef.current?.remove();
+      window.clearTimeout(showSoon);
+      ro.disconnect();
+      map.remove();
       mapRef.current = null;
     };
-    // init once
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -267,9 +240,7 @@ export function IssueMap({
     const source = map.getSource("issues") as GeoJSONSource | undefined;
     if (source) {
       source.setData(geojson);
-      if (!active) {
-        void loadMapLibre().then((m) => fitToIssues(map, geojson, m.LngLatBounds));
-      }
+      if (!active) fitToIssues(map, geojson);
     }
   }, [geojson, ready, fitToIssues, active]);
 
@@ -281,16 +252,9 @@ export function IssueMap({
         className,
       )}
     >
-      {!ready && !loadError && (
+      {!ready && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-map">
           <p className="text-sm text-muted-foreground">Térkép betöltése…</p>
-        </div>
-      )}
-      {loadError && !ready && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-map p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            A térkép most nem elérhető. Próbáld újra később.
-          </p>
         </div>
       )}
       <div
